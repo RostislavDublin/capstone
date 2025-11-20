@@ -1,0 +1,44 @@
+# Environment files (secrets)
+.env
+.env.dev
+.env.deploy
+
+# Service Account keys (NEVER commit)
+service-account-key.json
+*.pem
+github-app-key.pem
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db

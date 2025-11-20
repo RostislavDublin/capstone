@@ -1,0 +1,28 @@
+# Ignore Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Ignore database
+*.db
+*.sqlite3
+
+# Ignore IDE
+.vscode/
+.idea/
+*.swp
+
+# Ignore test results
+.pytest_cache/
+.coverage
+htmlcov/
+
+# DO NOT ignore intentionally bad code!
+# This is a test fixture - all the "bad" files should be committed

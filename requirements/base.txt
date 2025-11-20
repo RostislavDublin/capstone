@@ -1,0 +1,23 @@
+# Core Dependencies - Required for production runtime
+
+# ADK Framework (Google Agent Development Kit)
+google-genai>=0.2.0
+google-adk[all]>=0.1.0
+
+# GitHub Integration
+PyGithub>=2.1.1
+GitPython>=3.1.40
+
+# Data Validation & Configuration
+pydantic>=2.5.0
+python-dotenv>=1.0.0
+
+# Code Analysis Tools
+ast-grep>=0.13.0
+radon>=6.0.1
+bandit>=1.7.5
+
+# Google Cloud Platform (for deployment only, optional for dev)
+google-cloud-aiplatform>=1.38.0
+google-cloud-logging>=3.8.0
+vertexai>=1.38.0

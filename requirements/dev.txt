@@ -1,0 +1,17 @@
+# Development Dependencies
+
+-r base.txt
+
+# Code Quality
+black>=23.0.0
+ruff>=0.1.0
+mypy>=1.7.0
+isort>=5.12.0
+
+# Development Tools
+ipython>=8.17.0
+ipdb>=0.13.13
+
+# Documentation
+mkdocs>=1.5.3
+mkdocs-material>=9.4.0

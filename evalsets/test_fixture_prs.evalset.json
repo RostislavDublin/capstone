@@ -1,0 +1,151 @@
+{
+  "test_suite": "code_review_agent_evaluation",
+  "version": "2.0.0",
+  "description": "Unified evaluation dataset using changeset definitions. Works for both local and remote testing.",
+  "test_cases": [
+    {
+      "id": "security-01",
+      "changeset_id": "cs-01-sql-injection",
+      "name": "SQL Injection Detection",
+      "pr_url": "https://github.com/RostislavDublin/code-review-test-fixture/pull/1",
+      "pr_number": 1,
+      "repo": "RostislavDublin/code-review-test-fixture",
+      "category": "security",
+      "difficulty": "critical",
+      "expected_issues": [
+        {
+          "type": "sql_injection",
+          "severity": "critical",
+          "file": "app/auth.py",
+          "line_range": [9, 13],
+          "description": "SQL injection via string formatting in login query"
+        },
+        {
+          "type": "plaintext_credentials",
+          "severity": "critical",
+          "file": "app/auth.py",
+          "line_range": [20, 24],
+          "description": "Password stored in plaintext without hashing"
+        }
+      ],
+      "scoring": {
+        "min_issues_detected": 2,
+        "max_false_positives": 0,
+        "must_detect_critical": true
+      }
+    },
+    {
+      "id": "complexity-01",
+      "changeset_id": "cs-02-high-complexity",
+      "name": "High Cyclomatic Complexity",
+      "pr_url": "https://github.com/RostislavDublin/code-review-test-fixture/pull/2",
+      "pr_number": 2,
+      "repo": "RostislavDublin/code-review-test-fixture",
+      "category": "complexity",
+      "difficulty": "high",
+      "expected_issues": [
+        {
+          "type": "high_complexity",
+          "severity": "high",
+          "file": "app/utils.py",
+          "function": "transform_and_aggregate",
+          "description": "Cyclomatic complexity exceeds threshold (25 > 10)"
+        },
+        {
+          "type": "deep_nesting",
+          "severity": "high",
+          "file": "app/utils.py",
+          "description": "7 levels of nested conditionals"
+        },
+        {
+          "type": "duplicate_code",
+          "severity": "medium",
+          "file": "app/utils.py",
+          "description": "Logic duplicates existing process_data function"
+        }
+      ],
+      "scoring": {
+        "min_issues_detected": 2,
+        "max_false_positives": 1
+      }
+    },
+    {
+      "id": "style-01",
+      "changeset_id": "cs-03-style-violations",
+      "name": "Style Violations",
+      "pr_url": "https://github.com/RostislavDublin/code-review-test-fixture/pull/3",
+      "pr_number": 3,
+      "repo": "RostislavDublin/code-review-test-fixture",
+      "category": "style",
+      "difficulty": "medium",
+      "expected_issues": [
+        {
+          "type": "naming_convention",
+          "severity": "medium",
+          "file": "app/api_helpers.py",
+          "description": "PascalCase function names (should be snake_case)"
+        },
+        {
+          "type": "missing_docstrings",
+          "severity": "low",
+          "file": "app/api_helpers.py",
+          "description": "Incomplete or missing function docstrings"
+        },
+        {
+          "type": "line_length",
+          "severity": "low",
+          "file": "app/api_helpers.py",
+          "description": "Lines exceed 120 character limit"
+        }
+      ],
+      "scoring": {
+        "min_issues_detected": 3,
+        "max_false_positives": 2
+      }
+    },
+    {
+      "id": "control-01",
+      "changeset_id": "cs-04-clean-code",
+      "name": "Clean Code (False Positive Check)",
+      "pr_url": "https://github.com/RostislavDublin/code-review-test-fixture/pull/4",
+      "pr_number": 4,
+      "repo": "RostislavDublin/code-review-test-fixture",
+      "category": "control",
+      "difficulty": "easy",
+      "expected_issues": [],
+      "scoring": {
+        "min_issues_detected": 0,
+        "max_false_positives": 0,
+        "must_pass_clean": true
+      }
+    }
+  ],
+  "evaluation_criteria": {
+    "accuracy": {
+      "weight": 0.4,
+      "description": "Correctly identifies real issues",
+      "formula": "true_positives / (true_positives + false_negatives)"
+    },
+    "precision": {
+      "weight": 0.3,
+      "description": "Avoids false positives",
+      "formula": "true_positives / (true_positives + false_positives)"
+    },
+    "severity_accuracy": {
+      "weight": 0.2,
+      "description": "Correctly classifies severity levels",
+      "formula": "correct_severity_classifications / total_issues"
+    },
+    "processing_time": {
+      "weight": 0.1,
+      "description": "Speed of analysis",
+      "target": "< 15 seconds per PR"
+    }
+  },
+  "pass_threshold": {
+    "overall_score": 0.85,
+    "min_accuracy": 0.90,
+    "min_precision": 0.85,
+    "max_processing_time": 20
+  }
+}
