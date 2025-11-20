@@ -13,7 +13,7 @@ pydantic>=2.5.0
 python-dotenv>=1.0.0
 
 # Code Analysis Tools
-ast-grep>=0.13.0
+unidiff>=0.7.5
 radon>=6.0.1
 bandit>=1.7.5
 
