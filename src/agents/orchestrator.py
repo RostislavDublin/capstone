@@ -22,6 +22,7 @@ from tools.repo_merger import (
     cleanup_merged_repository,
     get_changed_files_from_diff
 )
+from memory.review_memory import MemoryBank
 
 
 @dataclass
@@ -44,7 +45,8 @@ class OrchestratorAgent:
         self,
         model_name: str = "gemini-2.0-flash-exp",
         max_retries: int = 2,
-        timeout: int = 120
+        timeout: int = 120,
+        memory_bank: Optional[MemoryBank] = None
     ):
         """Initialize orchestrator.
         
@@ -52,9 +54,11 @@ class OrchestratorAgent:
             model_name: Gemini model to use for all agents
             max_retries: Maximum retry attempts for failed operations
             timeout: Timeout in seconds for agent operations
+            memory_bank: Optional shared Memory Bank for all agents
         """
+        self.memory = memory_bank or MemoryBank()
         self.analyzer = AnalyzerAgent(model_name=model_name)
-        self.context = ContextAgent(model_name=model_name)
+        self.context = ContextAgent(model_name=model_name, memory_bank=self.memory)
         self.reporter = ReporterAgent()
         self.max_retries = max_retries
         self.timeout = timeout

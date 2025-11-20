@@ -7,6 +7,8 @@ This agent provides:
 - Memory-based pattern recognition
 """
 
+from typing import Optional
+
 from google import genai
 from google.genai import types
 
@@ -16,19 +18,27 @@ from tools.dependency_analyzer import (
     format_impact_report,
     ImpactAnalysis
 )
+from memory.review_memory import MemoryBank
+from models import IssueType
 
 
 class ContextAgent:
     """Agent for analyzing code context and dependencies."""
     
-    def __init__(self, model_name: str = "gemini-2.0-flash-exp"):
+    def __init__(
+        self,
+        model_name: str = "gemini-2.0-flash-exp",
+        memory_bank: Optional[MemoryBank] = None
+    ):
         """Initialize context agent.
         
         Args:
             model_name: Gemini model to use
+            memory_bank: Optional Memory Bank for pattern recognition
         """
         self.client = genai.Client()
         self.model_name = model_name
+        self.memory = memory_bank or MemoryBank()
         
     def analyze_context(
         self,
@@ -69,6 +79,10 @@ class ContextAgent:
         print("🤖 Step 3: Generating AI context insights...")
         ai_insights = self._generate_context_insights(impact, dep_graph)
         
+        # Recall similar patterns from memory
+        print("💾 Step 4: Checking memory for similar patterns...")
+        memory_insights = self._recall_patterns(impact, changed_files)
+        
         # Create summary
         summary = self._create_summary(impact, dep_graph)
         
@@ -76,6 +90,7 @@ class ContextAgent:
             "impact_analysis": impact,
             "dependency_graph": dep_graph,
             "ai_insights": ai_insights,
+            "memory_insights": memory_insights,
             "summary": summary
         }
     
@@ -194,3 +209,84 @@ Focus on practical, actionable insights."""
             lines.append("")
         
         return "\n".join(lines)
+    
+    def _recall_patterns(
+        self,
+        impact: ImpactAnalysis,
+        changed_files: list[str]  # noqa: ARG002
+    ) -> dict:
+        """Recall similar patterns from memory bank.
+        
+        Args:
+            impact: Impact analysis results
+            changed_files: List of changed files (reserved for future use)
+            
+        Returns:
+            dict with:
+                - similar_patterns: List of similar review patterns
+                - team_standards: Relevant team standards
+                - recommendations: Memory-based recommendations
+        """
+        memory_insights = {
+            "similar_patterns": [],
+            "team_standards": [],
+            "recommendations": []
+        }
+        
+        # Find similar patterns based on breaking changes
+        if impact.breaking_changes:
+            patterns = self.memory.find_similar_patterns(
+                issue_type=IssueType.BUG,
+                min_frequency=2
+            )
+            memory_insights["similar_patterns"] = patterns
+            
+            if patterns:
+                print(f"   Found {len(patterns)} similar patterns in memory")
+                memory_insights["recommendations"].append(
+                    f"⚠️  Similar breaking changes seen {patterns[0].frequency} times before"
+                )
+        
+        # Get relevant team standards
+        standards = self.memory.get_team_standards()
+        memory_insights["team_standards"] = standards
+        
+        if standards:
+            print(f"   Found {len(standards)} team standards")
+        
+        # Check for frequently violated standards
+        violated_standards = [s for s in standards if s.violations_count > 5]
+        if violated_standards:
+            memory_insights["recommendations"].append(
+                f"💡 Watch for common violations: {', '.join(s.category for s in violated_standards[:3])}"
+            )
+        
+        return memory_insights
+    
+    def store_review_outcome(
+        self,
+        issue_type: IssueType,
+        description: str,
+        code_example: str,
+        accepted: bool,
+        repo: Optional[str] = None
+    ):
+        """Store review outcome in memory for future reference.
+        
+        Args:
+            issue_type: Type of issue found
+            description: Issue description
+            code_example: Code that had the issue
+            accepted: Whether the review suggestion was accepted
+            repo: Optional repository scope
+        """
+        # Store pattern
+        pattern_id = self.memory.store_review_pattern(
+            issue_type=issue_type,
+            description=description,
+            code_example=code_example,
+            repo=repo
+        )
+        
+        # Update acceptance rate
+        self.memory.update_pattern_acceptance(pattern_id, accepted)
