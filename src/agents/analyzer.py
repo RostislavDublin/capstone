@@ -10,9 +10,10 @@ This agent analyzes pull requests by:
 from google import genai
 from google.genai import types
 
-from tools.diff_parser import parse_git_diff, get_added_code_blocks, get_modified_files_content
+from tools.diff_parser import parse_git_diff, get_added_code_blocks
 from tools.security_scanner import detect_security_issues, format_security_report
 from tools.complexity_analyzer import calculate_complexity, format_complexity_report
+from tools.repo_merger import create_merged_repository, cleanup_merged_repository, get_changed_files_from_diff
 
 
 class AnalyzerAgent:
@@ -30,9 +31,12 @@ class AnalyzerAgent:
     def analyze_pull_request(self, diff_text: str, base_repo_path: str = None) -> dict:
         """Analyze a pull request and provide intelligent recommendations.
         
+        Uses Repository Merger to create complete merged state (base + PR) for holistic analysis,
+        not just diff chunks. This enables intelligent code review like a human reviewer.
+        
         Args:
             diff_text: Git unified diff of the PR changes
-            base_repo_path: Path to base repository for applying diffs (optional)
+            base_repo_path: Path to base repository for creating merged state (optional)
             
         Returns:
             dict with analysis results including:
@@ -49,14 +53,27 @@ class AnalyzerAgent:
               f"{diff_analysis.total_additions} additions, "
               f"{diff_analysis.total_deletions} deletions")
         
-        # Step 2: Get full file contents after applying diff
-        print("\n🔍 Step 2: Applying diff to get full file contents...")
+        # Step 2: Create merged repository state (base + PR)
+        merged_repo_path = None
+        print("\n🔀 Step 2: Creating merged repository (base + PR)...")
         if base_repo_path:
-            # Apply diff to base repository
-            modified_files = get_modified_files_content(diff_text, base_repo_path)
-            print(f"   Extracted {len(modified_files)} complete files")
+            # NEW PARADIGM: Analyze complete merged state, not just diff chunks
+            merged_repo_path = create_merged_repository(base_repo_path, diff_text)
+            changed_files = get_changed_files_from_diff(diff_text)
+            print(f"   ✅ Merged state created at: {merged_repo_path}")
+            print(f"   📁 Analyzing {len(changed_files)} changed files in COMPLETE context")
+            
+            # Read complete files from merged state
+            from pathlib import Path
+            modified_files = {}
+            for file_path in changed_files:
+                full_path = Path(merged_repo_path) / file_path
+                if full_path.exists():
+                    modified_files[file_path] = full_path.read_text(encoding='utf-8')
+            print(f"   📄 Loaded {len(modified_files)} complete files for analysis")
         else:
-            # Fallback: just extract added code
+            # Fallback: just extract added code (primitive mode)
+            print("   ⚠️  No base_repo_path - using fallback mode (added code only)")
             added_code = get_added_code_blocks(diff_analysis)
             modified_files = {path: '\n'.join(lines) for path, lines in added_code.items()}
             print(f"   Extracted {len(modified_files)} files (added code only)")
@@ -114,6 +131,11 @@ class AnalyzerAgent:
         summary = self._create_summary(
             diff_analysis, total_security_issues, high_complexity_count, ai_recommendations
         )
+        
+        # Cleanup: Remove temporary merged repository
+        if merged_repo_path:
+            print("\n🧹 Cleaning up temporary merged repository...")
+            cleanup_merged_repository(merged_repo_path)
         
         return {
             "diff_analysis": diff_analysis,

@@ -7,15 +7,15 @@ from typing import Optional
 from datetime import datetime
 from pathlib import Path
 
-from capstone.models import (
+from models import (
     PullRequest,
     PRFile,
     PRAuthor,
     PRMetadata,
     PRDiff
 )
-from capstone.changesets import Changeset
-from capstone.tools.diff_generator import generate_diff_from_changeset
+from tests.fixtures.changesets import Changeset
+from tools.diff_generator import generate_diff_from_changeset
 
 
 def create_mock_pr_author(

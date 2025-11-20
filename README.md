@@ -9,11 +9,11 @@
 [![Progress](https://img.shields.io/badge/Progress-25%25-orange)]()
 [![Days](https://img.shields.io/badge/Days%20Remaining-11-red)]()
 
-> **Current Status (Day 2/14):** Testing infrastructure complete ✅ | Core agent implementation starting Day 3
+> **Current Status (Day 2/14):** Testing infrastructure complete | Core agent implementation starting Day 3
 
 ---
 
-## 🎯 Project Overview
+## Project Overview
 
 In October 2025, GitHub launched Agent HQ - the future of AI agent orchestration in development workflows. But there's a critical gap: while GitHub Copilot generates code at AI speed, human review is now the bottleneck.
 
@@ -73,51 +73,63 @@ PR Event (GitHub Webhook)
 
 ---
 
-## 🎓 Course Concepts Demonstrated
+## Course Concepts Demonstrated
 
 This project demonstrates **6 key concepts** from the Kaggle 5-Day Agents Course (minimum requirement: 3):
 
-1. ✅ **Multi-Agent System** - Three agents with parallel execution and orchestration
-2. ✅ **Custom Tools** - GitHub API, git parser, static analysis tools
-3. ✅ **Memory System** - ADK Memory Bank for review pattern retention
-4. ✅ **Observability** - Comprehensive logging and tracing
-5. ✅ **Agent Evaluation** - LLM-as-judge framework for quality metrics
-6. ✅ **Production Deployment** - Deployed on Vertex AI Agent Engine
+1. **Multi-Agent System** - Three agents with parallel execution and orchestration
+2. **Custom Tools** - GitHub API, git parser, static analysis tools
+3. **Memory System** - ADK Memory Bank for review pattern retention
+4. **Observability** - Comprehensive logging and tracing
+5. **Agent Evaluation** - LLM-as-judge framework for quality metrics
+6. **Production Deployment** - Deployed on Vertex AI Agent Engine
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 capstone/
-├── agents/               # Agent implementations (TODO: Day 3-8)
-├── changesets.py         # ✅ Test scenario definitions (426 lines)
-├── config.py             # ✅ Configuration management
-├── github_utils.py       # ✅ GitHub API client
-├── interfaces.py         # ✅ Agent interfaces (4 interfaces)
-├── memory_schema.py      # ✅ Memory Bank schemas (5 types)
-├── models.py             # ✅ Pydantic data models (15 schemas)
+├── src/                  # Core implementation
+│   ├── agents/                 # Agent implementations
+│   │   ├── analyzer.py         # Code analysis agent
+│   │   └── base.py             # Agent base classes
+│   ├── tools/                  # Analysis tools
+│   │   ├── diff_parser.py      # Git diff parser (7 tests)
+│   │   ├── security_scanner.py # Bandit integration (12 tests)
+│   │   ├── complexity_analyzer.py # Radon metrics (13 tests)
+│   │   └── repo_merger.py      # Merged state creator (10 tests)
+│   ├── models.py               # Pydantic data models
+│   └── config.py               # Configuration
 │
-├── tools/                # ✅ Shared utilities
-│   ├── diff_generator.py       # Synthetic git diffs
-│   └── mock_pr_context.py      # Mock PullRequest objects
+├── tests/                # Test suite (42 tests passing)
+│   ├── unit/                   # Unit tests
+│   │   ├── test_diff_parser.py
+│   │   ├── test_security_scanner.py
+│   │   ├── test_complexity_analyzer.py
+│   │   └── test_repo_merger.py
+│   ├── integration/            # Integration tests (TODO)
+│   ├── e2e/                    # End-to-end tests (TODO)
+│   └── fixtures/               # Test data
+│       ├── changesets.py       # Test scenarios
+│       └── test-app/           # Flask app with issues
 │
-├── tests/                # ✅ Test infrastructure
-│   └── test_changesets.py      # Unit tests (280+ lines)
+├── demos/                # Interactive demos
+│   ├── README.md               # Demo documentation
+│   └── demo_analyzer.py        # Analyzer Agent demo
 │
-├── evalsets/             # ✅ Evaluation datasets
-│   └── test_fixture_prs.evalset.json
+├── scripts/              # Dev/deploy utilities
+│   ├── deploy_fixture.py
+│   ├── create_test_prs.py
+│   └── reset_fixture.py
 │
-├── scripts/              # ✅ Automation scripts
-│   ├── deploy_fixture.py       # Deploy test repo
-│   ├── create_test_prs.py      # Create PRs from changesets
-│   └── reset_fixture.py        # Cleanup
+├── docs/                 # Documentation
+│   ├── project-plan.md         # 13-day timeline
+│   ├── architecture-overview.md
+│   └── testing-strategy.md
 │
-├── test-fixture/         # ✅ Test repository
-│   └── app/                    # Flask app with issues
-│
-└── docs/                 # ✅ Documentation
-    ├── project-plan.md           # 13-day timeline
+└── evalsets/             # Evaluation datasets
+    └── test_fixture_prs.evalset.json
     ├── testing-strategy.md       # Testing guide (300+ lines)
     ├── unified-testing-architecture.md  # Architecture overview
     ├── market-trends-2025.md     # Strategic positioning
@@ -125,12 +137,12 @@ capstone/
 ```
 
 **Legend:**
-- ✅ Completed (Days 1-2)
+- Completed (Days 1-2)
 - TODO: Remaining work (Days 3-14)
 
 ---
 
-## 🧪 Testing Infrastructure (Day 2 Achievement)
+## Testing Infrastructure (Day 2 Achievement)
 
 ### Unified Changeset Architecture
 
@@ -166,7 +178,7 @@ CHANGESET_01_SQL_INJECTION = Changeset(
 
 ---
 
-## 🚀 Quick Start (Coming Soon)
+## Quick Start (Coming Soon)
 
 > **Note:** Agent implementation starts Day 3. This section will be populated with working examples.
 
@@ -180,15 +192,33 @@ CHANGESET_01_SQL_INJECTION = Changeset(
 ### Local Development
 
 ```bash
-# Setup (TODO: Day 3)
-cd /path/to/ai/src/capstone
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+# Setup
+cd /path/to/ai/capstone
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -r requirements/dev.txt
 
-# Test locally (TODO: Day 9)
-pytest tests/
+# Run tests (42 tests passing ✅)
+pytest tests/unit/ -v
+
+# Try interactive demo
+python demos/demo_analyzer.py
+
+# Evaluation (TODO: Day 9)
 adk eval evalsets/test_fixture_prs.evalset.json
+```
+
+### Quick Demo
+
+```bash
+# See Analyzer Agent in action
+python demos/demo_analyzer.py
+
+# Output shows:
+# - Merged state creation (base + PR)
+# - Security issues detection (bandit)
+# - Complexity analysis (radon)
+# - AI recommendations (Gemini 2.0)
 ```
 
 ### Production Deployment (TODO: Day 11)
@@ -197,7 +227,7 @@ See [Deployment Guide](docs/deployment.md) when available.
 
 ---
 
-## 📊 Evaluation & Results
+## Evaluation & Results
 
 [To be populated after testing]
 
@@ -229,7 +259,7 @@ See [Project Plan](docs/project-plan.md) for detailed timeline.
 
 ---
 
-## 🎯 Competition Details
+## Competition Details
 
 - **Competition:** Kaggle 5-Day Agents Intensive Capstone Project
 - **Track:** Enterprise Agents
