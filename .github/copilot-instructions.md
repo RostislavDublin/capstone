@@ -2,11 +2,63 @@
 
 **IMPORTANT:** This file contains project-specific instructions. You MUST also read the workspace-level instructions at `../../.github/copilot-instructions.md` for multi-repo context and critical workflow rules.
 
+---
+
+# ⛔️ STOP: READ THIS BEFORE ANY GIT OPERATION ⛔️
+
+## GIT IRON RULE - NEVER VIOLATE
+
+**BEFORE running `git add`, `git commit`, or `git push`:**
+
+### MANDATORY CHECK:
+
+```
+Did user explicitly say one of these trigger phrases?
+  ✓ "commit"
+  ✓ "commit and push"
+  ✓ "c&p" 
+  ✓ "push"
+  ✓ "save to git"
+  ✓ "коммит" (Russian)
+  ✓ "запуш" (Russian)
+  ✓ "сохрани в git" (Russian)
+
+IF NO → STOP IMMEDIATELY
+  1. Show git status
+  2. Summarize what's ready
+  3. Say: "Ready to commit. Say 'commit and push' when ready."
+  4. WAIT - do nothing else
+
+IF YES → Proceed with git operations
+```
+
+### WHY THIS IS CRITICAL
+
+- User has forbidden unauthorized commits **multiple times**
+- Violating this wastes user's time (manual undo)
+- Breaks trust between user and assistant
+- **This is not a suggestion - this is an absolute requirement**
+
+### RECENT VIOLATIONS
+
+- **Nov 20, 2025 11:57:** Committed 880a499 without authorization
+  - User response: angry, reminded about the rule
+  - User demanded: make rule "железным" (iron-clad)
+
+### ENFORCEMENT
+
+Before EVERY git operation, ask yourself:
+- **"Did user say 'commit' or equivalent?"**
+- If you have ANY doubt → STOP and ask
+
+---
+
 ## Project Context
 
 **Name:** AI Code Review Orchestration System  
 **Purpose:** Multi-agent system for automated code review using Google ADK  
 **Timeline:** Nov 18 → Dec 1, 2025 (13 days)  
+**Current:** Day 3, Memory Bank complete (commit 880a499)
 **Stack:** Python, Google ADK, Gemini 2.0 Flash Exp, PyGithub  
 **Goal:** Kaggle competition - top 3 placement (95-100 points)
 
@@ -15,36 +67,10 @@
 Multi-agent system:
 - **Repository Merger** - applies PR to create merged state
 - **Analyzer Agent** - security (bandit) + complexity (radon) analysis
-- **Context Agent** - dependency analysis + impact assessment
+- **Context Agent** - dependency analysis + impact assessment + **Memory Bank** ✅
 - **Reporter Agent** - formats findings, posts to GitHub
-- **Orchestrator** - coordinates all agents
-
-## Critical Rules
-
-### Git Workflow - ABSOLUTE REQUIREMENT
-
-**NEVER commit or push without explicit user permission.**
-
-User must explicitly say one of:
-- "commit"
-- "commit and push"
-- "save to git"
-- "push to github"
-
-**FORBIDDEN actions without permission:**
-- `git add`
-- `git commit`
-- `git push`
-- Any git operation that changes repository state
-
-**Correct workflow:**
-1. Complete all work
-2. Show `git status` or list changes
-3. **WAIT for user to say "commit"**
-4. Only then: add, commit, push
-
-**Violation consequences:**
-User has to manually undo commits. This wastes time and breaks trust.
+- **Orchestrator** - coordinates all agents + shared Memory Bank ✅
+- **Memory Bank** - pattern recognition and learning ✅ (NEW)
 
 ### File Organization
 
