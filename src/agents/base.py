@@ -6,7 +6,7 @@ Defines the public API for each agent and orchestrator.
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from .models import (
+from models import (
     AnalyzerInput, AnalyzerOutput,
     ContextInput, ContextOutput,
     ReporterInput, ReporterOutput,

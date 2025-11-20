@@ -1,8 +1,37 @@
-# Architecture Diagrams
+# Architecture Overview
 
-PlantUML diagrams for the AI Code Review Orchestration System.
+## System Philosophy: Intelligent Reviewer, Not Simple Linter
 
-## Multi-Agent Architecture
+Our AI Code Review Orchestration System emulates **human reviewer behavior** by analyzing the complete merged state of the repository, not just isolated diff chunks.
+
+### Key Architectural Principles
+
+**1. Merged State Analysis**
+- System applies PR to temporary repository copy
+- All agents analyze the **result of the merge**, not just the diff
+- Ensures comprehensive understanding of final code state
+
+**2. Holistic Context**
+- Dependency graph analysis across entire codebase
+- Integration point validation (callers of modified functions)
+- Backward compatibility checks
+
+**3. Multi-Agent Coordination**
+- Each agent specializes in one aspect of review
+- Shared context through Memory Bank
+- Orchestrator synthesizes findings into coherent review
+
+---
+
+## System Components
+
+### 1. Repository Merger (Pre-processing)
+- Clones base repository to temporary location
+- Applies PR patch using `git apply` or equivalent
+- Provides merged state path to analysis agents
+- Cleanup after review completion
+
+### 2. Multi-Agent Architecture
 
 Overall system architecture showing three agents and orchestration:
 

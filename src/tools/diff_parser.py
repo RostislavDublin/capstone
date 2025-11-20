@@ -157,3 +157,62 @@ def get_added_code_blocks(diff_analysis: DiffAnalysis) -> Dict[str, List[str]]:
             code_blocks[file_change.path] = added_lines
     
     return code_blocks
+
+
+def get_modified_files_content(
+    diff_text: str,
+    base_repo_path: str
+) -> Dict[str, str]:
+    """Get full file contents for analysis.
+    
+    For new files: extracts complete content from diff
+    For modified files: reads the ENTIRE original file from base repo
+    
+    This ensures security/complexity scanners have full file context.
+    Note: This analyzes the OLD version, not the patched version.
+    For code review, we care about what's ALREADY in the repo.
+    
+    Args:
+        diff_text: Git diff in unified format
+        base_repo_path: Path to base repository
+        
+    Returns:
+        Dict mapping file paths to complete file contents
+    """
+    from pathlib import Path
+    
+    patch_set = PatchSet(diff_text)
+    files_content = {}
+    
+    for patched_file in patch_set:
+        if patched_file.is_removed_file:
+            continue
+            
+        file_path = patched_file.path
+        
+        if patched_file.is_added_file:
+            # New file: extract all added lines
+            lines = []
+            for hunk in patched_file:
+                for line in hunk:
+                    if line.is_added:
+                        lines.append(line.value.rstrip('\n\r'))
+            files_content[file_path] = '\n'.join(lines)
+        else:
+            # Modified file: read original file completely
+            original_path = Path(base_repo_path) / file_path
+            if original_path.exists():
+                with open(original_path, 'r', encoding='utf-8') as f:
+                    files_content[file_path] = f.read()
+            else:
+                # Fallback: extract added lines if original not found
+                lines = []
+                for hunk in patched_file:
+                    for line in hunk:
+                        if line.is_added:
+                            lines.append(line.value.rstrip('\n\r'))
+                if lines:
+                    files_content[file_path] = '\n'.join(lines)
+    
+    return files_content
+

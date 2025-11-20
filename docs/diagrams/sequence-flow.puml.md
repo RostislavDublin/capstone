@@ -30,25 +30,54 @@ skinparam database {
 actor Developer as dev
 participant "GitHub" as gh
 participant "Orchestrator" as orch
+participant "Repo Merger" as merger
 participant "Analyzer" as ana
 participant "Context" as ctx
 participant "Reporter" as rep
 database "Memory" as mem
 
 dev -> gh : Create PR
-gh -> orch : Webhook
+gh -> orch : Webhook (PR event)
 
-orch -> ana : Analyze
-orch -> ctx : Get Context
+orch -> gh : Fetch PR diff
+gh --> orch : Diff content
 
-ana --> orch : Issues
-ctx -> mem : Query
-mem --> ctx : Patterns
-ctx --> orch : Context
+orch -> gh : Clone base repo
+gh --> orch : Base repository
 
-orch -> rep : Generate Review
-rep -> gh : Post Comment
-rep -> mem : Update Patterns
+orch -> merger : Apply PR to base
+note right of merger
+  Creates temp directory
+  Applies patch via git apply
+  Returns merged state path
+end note
+merger --> orch : Merged repo path
+
+orch -> ana : Analyze(merged_repo_path, changed_files)
+note right of ana
+  Scans COMPLETE files
+  in merged state
+  Not just diff chunks
+end note
+ana --> orch : Security + Complexity Issues
+
+orch -> ctx : Get Context(merged_repo_path, changed_files)
+note right of ctx
+  Builds dependency graph
+  Finds affected modules
+  Checks integration points
+end note
+
+ctx -> mem : Query patterns
+mem --> ctx : Historical patterns
+ctx --> orch : Integration risks
+
+orch -> rep : Generate Review(all_findings)
+rep -> gh : Post review comment
+rep -> mem : Update patterns
+
+orch -> merger : Cleanup temp repo
+merger --> orch : Done
 
 @enduml
 ```

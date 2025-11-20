@@ -2,14 +2,14 @@
 
 from agents.base import (
     BaseAgent,
-    AnalyzerInterface,
-    ContextInterface,
-    ReporterInterface,
+    AnalyzerAgentInterface,
+    ContextAgentInterface,
+    ReporterAgentInterface,
 )
 
 __all__ = [
     "BaseAgent",
-    "AnalyzerInterface",
-    "ContextInterface",
-    "ReporterInterface",
+    "AnalyzerAgentInterface",
+    "ContextAgentInterface",
+    "ReporterAgentInterface",
 ]
