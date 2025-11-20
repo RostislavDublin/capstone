@@ -34,6 +34,7 @@ skinparam database {
 ' Level 1: Input
 cloud "GitHub" as github {
   component "PR Event" as pr_event
+  component "Base Repo" as base_repo
 }
 
 ' Level 2: Orchestration
@@ -41,11 +42,16 @@ rectangle "Orchestrator" as Orchestrator <<agent>> {
   component "Coordinator" as coordinator
 }
 
-pr_event -down-> coordinator : 1. PR webhook
+' Level 2.5: Pre-processing
+component "Repository Merger" as repo_merger <<tool>>
 
-coordinator -down-> Analyzer : 2a. Analyze
-coordinator -down-> Context : 2b. Get context
-coordinator -down-> Reporter : 5. Generate report
+pr_event -down-> coordinator : 1. PR webhook
+coordinator -down-> repo_merger : 2. Apply PR
+base_repo -down-> repo_merger : Clone
+repo_merger -down-> Analyzer : 3a. Merged repo path
+repo_merger -down-> Context : 3b. Merged repo path
+
+coordinator -down-> Reporter : 6. Generate report
 
 ' Level 3: Agent Layer
 rectangle "Analyzer" as Analyzer <<agent>> {

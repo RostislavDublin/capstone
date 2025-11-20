@@ -29,41 +29,52 @@
 
 ## 🏗️ Technical Architecture
 
-### Multi-Agent System (3 Agents):
+### System Components:
+
+**0. Repository Merger (Pre-processing)**
+- **Role:** Apply PR to create merged repository state
+- **Tools:** 
+  - Git operations (clone, apply patch)
+  - Temporary workspace management
+- **Output:** Path to merged repository for analysis
 
 **1. Analyzer Agent**
-- **Role:** Primary code analysis and issue detection
+- **Role:** Primary code analysis on merged state
 - **Tools:** 
-  - Git diff parser
-  - Static analysis (AST parsing)
-  - Code quality metrics
-- **Output:** List of issues, suggestions, severity levels
+  - Diff parser (metadata about changes)
+  - Security scanner (bandit)
+  - Complexity analyzer (radon)
+- **Output:** Security issues, complexity metrics
 
 **2. Context Agent**
-- **Role:** Gather historical context and institutional knowledge
+- **Role:** Dependency analysis and integration validation
 - **Tools:**
-  - GitHub API (previous PR comments, review patterns)
-  - Memory Bank (ADK) - retained learnings
-  - Code standards retrieval
-- **Output:** Relevant context for current review
+  - Dependency graph builder (AST parsing)
+  - Memory Bank (ADK) - retained patterns
+  - Integration checker (API surface comparison)
+- **Output:** Affected modules, breaking changes, integration risks
 
 **3. Reporter Agent**
-- **Role:** Generate human-readable review summaries
+- **Role:** Synthesize findings into review
 - **Tools:**
+  - Summary generator
   - GitHub API (post comments)
-  - Ticket creation (optional: Jira/GitHub Issues)
-  - Markdown formatting
-- **Output:** Formatted review comments, action items
+  - Markdown formatter
+- **Output:** Comprehensive review comment with recommendations
 
 ### Agent Orchestration:
 ```
 PR Event (webhook)
     ↓
-Analyzer Agent (parallel with Context Agent)
-    ↓                    ↓
-  Issues           Context/History
-    ↓                    ↓
-    └──> Reporter Agent ───> GitHub Comment + Summary
+Clone Base Repo + Apply PR → Merged Repository
+    ↓
+Analyzer Agent (merged state) || Context Agent (merged state)
+    ↓                                ↓
+  Issues                        Integration Risks
+    ↓                                ↓
+    └────> Reporter Agent ──────────┘
+               ↓
+         GitHub Comment + Action Items
 ```
 
 ---
