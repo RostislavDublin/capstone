@@ -1,0 +1,225 @@
+"""Tests for Reporter Agent."""
+
+import pytest
+from agents.reporter import ReporterAgent, ReviewReport
+from tools.security_scanner import SecurityScanResult, SecurityIssue
+from tools.complexity_analyzer import CodeComplexityResult, FunctionComplexity
+from tools.dependency_analyzer import ImpactAnalysis
+
+
+def test_generate_report_basic():
+    """Test basic report generation."""
+    agent = ReporterAgent()
+    
+    analyzer_results = {
+        "diff_analysis": {
+            "files_changed": 2,
+            "total_additions": 50,
+            "total_deletions": 10
+        },
+        "security_issues": {},
+        "complexity_analysis": {}
+    }
+    
+    context_results = {
+        "impact_analysis": ImpactAnalysis(
+            changed_modules=["app.py"],
+            affected_modules=[],
+            breaking_changes=[],
+            risk_level="low"
+        )
+    }
+    
+    report = agent.generate_report(analyzer_results, context_results)
+    
+    assert "2 files modified" in report.summary
+    assert "+50 / -10 lines" in report.summary
+    assert report.overall_verdict == "APPROVE"
+
+
+def test_determine_verdict_approve():
+    """Test verdict determination for clean code."""
+    agent = ReporterAgent()
+    
+    analyzer_results = {"security_issues": {}, "complexity_analysis": {}}
+    context_results = {
+        "impact_analysis": ImpactAnalysis(
+            changed_modules=["test.py"],
+            affected_modules=[],
+            breaking_changes=[],
+            risk_level="low"
+        )
+    }
+    
+    verdict = agent._determine_verdict(analyzer_results, context_results)
+    assert verdict == "APPROVE"
+
+
+def test_determine_verdict_request_changes_security():
+    """Test verdict for high severity security issues."""
+    agent = ReporterAgent()
+    
+    security_result = SecurityScanResult(
+        issues=[
+            SecurityIssue(
+                issue_severity="HIGH",
+                issue_confidence="HIGH",
+                issue_text="Critical security issue",
+                test_id="B101",
+                test_name="assert_used",
+                line_number=10,
+                line_range=[10, 10],
+                code="dangerous_code()"
+            )
+        ],
+        total_issues=1,
+        high_severity_count=1,
+        medium_severity_count=0,
+        low_severity_count=0
+    )
+    
+    analyzer_results = {
+        "security_issues": {"test.py": security_result},
+        "complexity_analysis": {}
+    }
+    
+    context_results = {"impact_analysis": None}
+    
+    verdict = agent._determine_verdict(analyzer_results, context_results)
+    assert verdict == "REQUEST_CHANGES"
+
+
+def test_determine_verdict_request_changes_breaking():
+    """Test verdict for breaking changes."""
+    agent = ReporterAgent()
+    
+    analyzer_results = {"security_issues": {}, "complexity_analysis": {}}
+    context_results = {
+        "impact_analysis": ImpactAnalysis(
+            changed_modules=["api.py"],
+            affected_modules=["client.py"],
+            breaking_changes=["Removed public function: old_api"],
+            risk_level="high"
+        )
+    }
+    
+    verdict = agent._determine_verdict(analyzer_results, context_results)
+    assert verdict == "REQUEST_CHANGES"
+
+
+def test_determine_verdict_comment():
+    """Test verdict for medium severity issues."""
+    agent = ReporterAgent()
+    
+    security_result = SecurityScanResult(
+        issues=[
+            SecurityIssue(
+                issue_severity="MEDIUM",
+                issue_confidence="MEDIUM",
+                issue_text="Medium issue",
+                test_id="B201",
+                test_name="flask_debug_true",
+                line_number=20,
+                line_range=[20, 20],
+                code="code()"
+            )
+        ],
+        total_issues=1,
+        high_severity_count=0,
+        medium_severity_count=1,
+        low_severity_count=0
+    )
+    
+    analyzer_results = {
+        "security_issues": {"test.py": security_result},
+        "complexity_analysis": {}
+    }
+    
+    context_results = {"impact_analysis": None}
+    
+    verdict = agent._determine_verdict(analyzer_results, context_results)
+    assert verdict == "COMMENT"
+
+
+def test_format_as_github_comment():
+    """Test GitHub comment formatting."""
+    agent = ReporterAgent()
+    
+    report = ReviewReport(
+        summary="Test summary\n2 files changed",
+        security_section="No security issues",
+        complexity_section="No complexity issues",
+        context_section="Risk: LOW",
+        ai_recommendations="Test recommendations",
+        overall_verdict="APPROVE"
+    )
+    
+    markdown = agent.format_as_github_comment(report)
+    
+    assert "## AI Code Review Report" in markdown
+    assert "Test summary" in markdown
+    assert "### Security Analysis" in markdown
+    assert "### AI Recommendations" in markdown
+    assert "APPROVE" in markdown
+    assert "Generated by AI Code Review System" in markdown
+
+
+def test_format_security_findings():
+    """Test security findings formatting."""
+    agent = ReporterAgent()
+    
+    security_result = SecurityScanResult(
+        issues=[
+            SecurityIssue(
+                issue_severity="HIGH",
+                issue_confidence="HIGH",
+                issue_text="SQL injection vulnerability detected",
+                test_id="B101",
+                test_name="assert_used",
+                line_number=15,
+                line_range=[15, 15],
+                code="query = f'SELECT * FROM users WHERE id={user_id}'"
+            )
+        ],
+        total_issues=1,
+        high_severity_count=1,
+        medium_severity_count=0,
+        low_severity_count=0
+    )
+    
+    security_issues = {"app/database.py": security_result}
+    formatted = agent._format_security_findings(security_issues)
+    
+    assert "app/database.py" in formatted
+    assert "1 issues" in formatted
+    assert "Line 15" in formatted
+    assert "SQL injection" in formatted
+
+
+def test_format_complexity_findings():
+    """Test complexity findings formatting."""
+    agent = ReporterAgent()
+    
+    complexity_result = CodeComplexityResult(
+        functions=[
+            FunctionComplexity(
+                name="complex_function",
+                lineno=10,
+                col_offset=0,
+                endline=50,
+                cyclomatic_complexity=25,
+                complexity_rank="D"
+            )
+        ],
+        average_complexity=25.0,
+        total_complexity=25,
+        high_complexity_count=1
+    )
+    
+    complexity_analysis = {"app/logic.py": complexity_result}
+    formatted = agent._format_complexity_findings(complexity_analysis)
+    
+    assert "app/logic.py" in formatted
+    assert "1 high-complexity functions" in formatted
+    assert "complex_function" in formatted
+    assert "CC=25" in formatted
