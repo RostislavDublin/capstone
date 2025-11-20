@@ -1,7 +1,7 @@
 """Agent tools for GitHub integration and code analysis."""
 
-from capstone.tools.github import GitHubAPIClient
-from capstone.tools.diff_generator import (
+from tools.github import GitHubAPIClient
+from tools.diff_generator import (
     generate_diff_from_changeset,
     generate_all_diffs,
 )

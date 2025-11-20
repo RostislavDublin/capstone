@@ -1,6 +1,6 @@
 """Memory system for pattern retention and learning."""
 
-from capstone.memory.schema import (
+from memory.schema import (
     MemoryType,
     StorageKey,
     ReviewPatternMemory,

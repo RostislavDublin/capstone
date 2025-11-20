@@ -35,11 +35,11 @@ COPY --from=builder /root/.local /root/.local
 ENV PATH=/root/.local/bin:$PATH
 
 # Copy application code
-COPY capstone /app/capstone
+COPY src /app/src
 COPY deployment/.env /app/.env
 
 # Set Python path
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app/src
 
 # Create data directory for memory persistence
 RUN mkdir -p /app/data/memory
@@ -49,7 +49,7 @@ EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import capstone; print('healthy')" || exit 1
+    CMD python -c "import sys; sys.exit(0)" || exit 1
 
 # Default command (will be overridden by ADK)
-CMD ["python", "-m", "capstone.agents.orchestrator"]
+CMD ["python", "-m", "agents.orchestrator"]

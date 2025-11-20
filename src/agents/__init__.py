@@ -1,6 +1,6 @@
 """Agent implementations."""
 
-from capstone.agents.base import (
+from agents.base import (
     BaseAgent,
     AnalyzerInterface,
     ContextInterface,
