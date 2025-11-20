@@ -1,7 +1,7 @@
 ```plantuml
 @startuml multi-agent-architecture
 !theme plain
-top to bottom direction
+left to right direction
 
 skinparam component {
   BackgroundColor<<github>> #FFF4E0
@@ -48,50 +48,47 @@ coordinator -down-> analyzer : 2a. Analyze
 coordinator -down-> context : 2b. Get context
 coordinator -down-> reporter : 5. Generate report
 
-' Level 3: Agent Layer (left to right: Analyzer, Context, Reporter)
-left to right direction
-
+' Level 3: Agent Layer
 rectangle "Analyzer Agent" as analyzer <<agent>> {
-  top to bottom direction
-  component "Diff Parser" as diff_parser
-  component "Code Analyzer" as code_analyzer
-  component "Gemini Flash" as gemini_flash
+  component "Agent Logic (Gemini Flash)" as agent_logic
+  component "Diff Parser\n(unidiff)" as diff_parser <<tool>>
+  component "Security Scanner\n(bandit)" as security_scanner <<tool>>
+  component "Complexity Analyzer\n(radon)" as complexity_analyzer <<tool>>
   
-  diff_parser -down-> code_analyzer : 3a. Parse diff
-  code_analyzer -down-> gemini_flash : 3b. AI analysis
+  agent_logic -down-> diff_parser
+  agent_logic -down-> security_scanner  
+  agent_logic -down-> complexity_analyzer
+  
+  diff_parser -[hidden]right-> security_scanner
+  security_scanner -[hidden]right-> complexity_analyzer
 }
 
 rectangle "Context Agent" as context <<agent>> {
-  top to bottom direction
-  component "Memory Bank" as memory_bank
-  component "Pattern Matcher" as pattern_matcher
-  component "Gemini Pro" as gemini_pro
+  component "Agent Logic (Gemini Pro)" as context_logic
+  component "Memory Bank" as memory_bank <<tool>>
+  component "Pattern Matcher" as pattern_matcher <<tool>>
   
-  memory_bank -down-> pattern_matcher : 3c. Match patterns
-  pattern_matcher -down-> gemini_pro : 3d. Contextualize
+  context_logic -down-> memory_bank
+  context_logic -down-> pattern_matcher
+  
+  memory_bank -[hidden]right-> pattern_matcher
 }
 
 rectangle "Reporter Agent" as reporter <<agent>> {
-  top to bottom direction
-  component "Summary Generator" as summary_gen
-  component "Formatter" as formatter
+  component "Agent Logic (Gemini Flash)" as reporter_logic
+  component "Summary Generator" as summary_gen <<tool>>
+  component "Formatter" as formatter <<tool>>
   
-  summary_gen -down-> formatter : 6. Format
+  reporter_logic -down-> summary_gen
+  reporter_logic -down-> formatter
+  
+  summary_gen -[hidden]right-> formatter
 }
 
-analyzer -[hidden]right-> context
-context -[hidden]right-> reporter
-
-top to bottom direction
-
-' Level 4: Tools (separate blocks to avoid pull)
-component "Static Analysis" as static_analysis <<tool>>
+' Level 4: External Tools/APIs
 component "GitHub API" as github_api <<tool>>
 
-code_analyzer -down-> static_analysis : 4a. AST parsing
 formatter -down-> github_api : 7. Post comment
-
-static_analysis -[hidden]right-> github_api
 
 @enduml
 ```
