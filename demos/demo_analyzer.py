@@ -8,37 +8,22 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from agents.analyzer import AnalyzerAgent
 
-# Path to test repository
-TEST_REPO_PATH = str(Path(__file__).parent.parent / "tests" / "fixtures" / "test-app")
+# Paths
+FIXTURES_DIR = Path(__file__).parent.parent / "tests" / "fixtures"
+TEST_REPO_PATH = str(FIXTURES_DIR / "test-app")
+SAMPLE_DIFF_PATH = FIXTURES_DIR / "diffs" / "complex_pr.diff"
 
 
 def main():
     """Run analyzer agent on a sample diff with security and complexity issues."""
     
-    # Sample diff modifying existing file from test-app
-    sample_diff = """diff --git a/app/database.py b/app/database.py
-index abc1234..def5678 100644
---- a/app/database.py
-+++ b/app/database.py
-@@ -50,6 +50,17 @@ def search_users(username: str) -> list:
-     return results
- 
- 
-+def execute_raw_query(query: str):
-+    \"\"\"🚨 CRITICAL: Execute arbitrary SQL - massive security hole!\"\"\"
-+    conn = get_connection()
-+    cursor = conn.cursor()
-+    # DANGEROUS: Execute user-provided SQL directly
-+    cursor.execute(query)
-+    conn.commit()
-+    results = cursor.fetchall()
-+    return results
-+
-+
- def delete_user(user_id):
-     \"\"\"🚨 CRITICAL: SQL injection in DELETE.\"\"\"
-     conn = get_connection()
-"""
+    # Load diff from fixture
+    if not SAMPLE_DIFF_PATH.exists():
+        print(f"Error: Diff fixture not found: {SAMPLE_DIFF_PATH}")
+        print("Run: python tests/fixtures/_generate_diffs.py")
+        sys.exit(1)
+    
+    sample_diff = SAMPLE_DIFF_PATH.read_text()
     
     print("🚀 Initializing Analyzer Agent...")
     agent = AnalyzerAgent(model_name="gemini-2.0-flash-exp")
@@ -55,7 +40,7 @@ index abc1234..def5678 100644
     
     # Print detailed security report (if issues found)
     if result["security_issues"]:
-        print("\n\n📋 DETAILED SECURITY REPORT:")
+        print("\n\nDETAILED SECURITY REPORT:")
         print("=" * 80)
         for file_path, sec_result in result["security_issues"].items():
             if sec_result.total_issues > 0:
@@ -65,7 +50,7 @@ index abc1234..def5678 100644
     
     # Print detailed complexity report (if issues found)
     if result["complexity_analysis"]:
-        print("\n\n📋 DETAILED COMPLEXITY REPORT:")
+        print("\n\nDETAILED COMPLEXITY REPORT:")
         print("=" * 80)
         for file_path, comp_result in result["complexity_analysis"].items():
             if comp_result.high_complexity_count > 0:

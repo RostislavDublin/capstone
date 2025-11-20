@@ -1,0 +1,21 @@
+diff --git a/app/database.py b/app/database.py
+index aff1b6e..f06f732 100644
+--- a/app/database.py
++++ b/app/database.py
+@@ -56,6 +56,16 @@ def delete_user(user_id):
+     # No error handling at all
+ 
+ 
++def execute_raw_query(query: str):
++    """Execute arbitrary SQL - security hole!"""
++    conn = get_connection()
++    cursor = conn.cursor()
++    cursor.execute(query)  # SQL injection vulnerability
++    conn.commit()
++    return cursor.fetchall()
++
++
++
+ # ⚠️ HIGH: Function never called, but creates connection leak
+ def init_db():
+     conn = get_connection()
