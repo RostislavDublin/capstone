@@ -5,7 +5,6 @@ left to right direction
 
 skinparam component {
   BackgroundColor<<github>> #FFF4E0
-  BackgroundColor<<orchestrator>> #E3F2FD
   BackgroundColor<<agent>> #E8F5E9
   BackgroundColor<<tool>> #FFEBEE
   BorderColor #999999
@@ -38,18 +37,18 @@ cloud "GitHub" as github {
 }
 
 ' Level 2: Orchestration
-rectangle "Orchestrator" as orchestrator <<orchestrator>> {
+rectangle "Orchestrator" as Orchestrator <<agent>> {
   component "Coordinator" as coordinator
 }
 
 pr_event -down-> coordinator : 1. PR webhook
 
-coordinator -down-> analyzer : 2a. Analyze
-coordinator -down-> context : 2b. Get context
-coordinator -down-> reporter : 5. Generate report
+coordinator -down-> Analyzer : 2a. Analyze
+coordinator -down-> Context : 2b. Get context
+coordinator -down-> Reporter : 5. Generate report
 
 ' Level 3: Agent Layer
-rectangle "Analyzer Agent" as analyzer <<agent>> {
+rectangle "Analyzer" as Analyzer <<agent>> {
   component "Agent Logic (Gemini Flash)" as agent_logic
   component "Diff Parser\n(unidiff)" as diff_parser <<tool>>
   component "Security Scanner\n(bandit)" as security_scanner <<tool>>
@@ -63,7 +62,7 @@ rectangle "Analyzer Agent" as analyzer <<agent>> {
   security_scanner -[hidden]right-> complexity_analyzer
 }
 
-rectangle "Context Agent" as context <<agent>> {
+rectangle "Context" as Context <<agent>> {
   component "Agent Logic (Gemini Pro)" as context_logic
   component "Memory Bank" as memory_bank <<tool>>
   component "Pattern Matcher" as pattern_matcher <<tool>>
@@ -74,7 +73,7 @@ rectangle "Context Agent" as context <<agent>> {
   memory_bank -[hidden]right-> pattern_matcher
 }
 
-rectangle "Reporter Agent" as reporter <<agent>> {
+rectangle "Reporter" as Reporter <<agent>> {
   component "Agent Logic (Gemini Flash)" as reporter_logic
   component "Summary Generator" as summary_gen <<tool>>
   component "Formatter" as formatter <<tool>>
