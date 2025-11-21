@@ -5,7 +5,7 @@ Set GITHUB_TOKEN in .env to run these tests.
 """
 
 import pytest
-from src.github import GitHubClient
+from src.gh_integration import GitHubClient
 
 
 @pytest.mark.integration

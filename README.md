@@ -1,38 +1,59 @@
-# GitHub Integration Layer
+# AI Code Review Bot - v2 GitHub-First Architecture
 
 GitHub-First implementation for the AI Code Review Bot.
 
 ## Structure
 
-- `src/github/` - GitHub integration layer
+- `src/gh_integration/` - GitHub integration layer
   - `client.py` - PyGithub wrapper for GitHub API operations
   - `context.py` - PR context loading and representation
   - `webhooks.py` - Webhook event handling
+- `src/agents/` - Analysis agents
+  - `analyzer.py` - Security + complexity analysis
+  - `formatter.py` - Review comment formatting
+- `src/tools/` - Analysis tools
+  - `security_scanner.py` - Bandit wrapper
+  - `complexity_analyzer.py` - Radon wrapper
+- `tests/fixtures/` - Test fixtures
+  - `test_repo_manager.py` - Automatic test repo setup/teardown
 
 ## Integration Tests
 
-Tests use real GitHub API calls. To run:
+Tests use **real GitHub API** with automatic test repository management.
+
+### Setup
 
 1. Create `.env` file:
 ```bash
 cp .env.example .env
 ```
 
-2. Add your GitHub token and test repo:
-```
-GITHUB_TOKEN=your_github_token_here
-TEST_REPO=RostislavDublin/test-code-review
-TEST_PR_NUMBER=1
+2. Add your GitHub token:
+```env
+GITHUB_TOKEN=your_token_here
 ```
 
-3. Run tests:
+Get token from: https://github.com/settings/tokens (scopes: `repo`, `write:discussion`)
+
+### Running Tests
+
 ```bash
-# All integration tests
+# All integration tests (auto-creates test repo and PRs)
 pytest tests/integration -v -m integration
 
 # Specific test file
-pytest tests/integration/test_github_client.py -v -m integration
+pytest tests/integration/test_analyzer.py -v -m integration
+
+# With output
+pytest tests/integration -v -m integration -s
 ```
+
+### How Test Fixtures Work
+
+1. **First run**: Creates `test-code-review-app` repository, initializes with test app
+2. **Each test session**: Creates fresh PRs with unique branch names (timestamp)
+3. **After tests**: Closes PRs and deletes branches (repo stays for reuse)
+4. **Idempotent**: Can run tests multiple times without conflicts
 
 ## API Coverage
 

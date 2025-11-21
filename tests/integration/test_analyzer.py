@@ -1,7 +1,7 @@
 """Integration test for Analyzer agent with real PR."""
 
 import pytest
-from src.github import GitHubClient, PRContextLoader
+from src.gh_integration import GitHubClient, PRContextLoader
 from src.agents.analyzer import AnalyzerAgent
 from src.agents.formatter import (
     format_inline_comment,
@@ -90,7 +90,7 @@ def test_format_and_post_comments(github_token: str, test_repo: str, test_pr_num
 @pytest.mark.integration
 def test_analyzer_handles_syntax_errors(github_token: str, test_repo: str):
     """Test that analyzer gracefully handles files with syntax errors."""
-    from src.github.context import PRContext, FileChange
+    from src.gh_integration.context import PRContext, FileChange
     from datetime import datetime
 
     # Create mock PR context with invalid Python code

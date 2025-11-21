@@ -4,7 +4,7 @@ These tests validate webhook payload parsing.
 """
 
 import pytest
-from src.github import WebhookHandler, WebhookEvent
+from src.gh_integration import WebhookHandler, WebhookEvent
 
 
 @pytest.mark.integration

@@ -4,7 +4,7 @@ These tests use real GitHub API calls to validate functionality.
 """
 
 import pytest
-from src.github import GitHubClient, PRContextLoader
+from src.gh_integration import GitHubClient, PRContextLoader
 
 
 @pytest.mark.integration

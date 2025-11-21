@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import List, Dict, Optional
 
-from src.github.context import PRContext, FileChange
+from src.gh_integration.context import PRContext, FileChange
 from src.tools.security_scanner import detect_security_issues, SecurityIssue
 from src.tools.complexity_analyzer import calculate_complexity, FunctionComplexity
 
