@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from src.audit_models import CommitAudit, RepositoryAudit
+from src.audit_models import CommitAudit, FileAudit, RepositoryAudit
 from src.connectors.base import CommitInfo, RepositoryConnector
 from src.tools.complexity_analyzer import calculate_complexity
 from src.tools.security_scanner import detect_security_issues
@@ -57,75 +57,49 @@ class AuditEngine:
             # Find all Python files in repository
             python_files = self._find_python_files(repo_path)
 
-            # Analyze security across all files
-            security_issues = []
+            # Analyze each file separately (NEW: per-file audits)
+            file_audits = []
             for py_file in python_files:
-                try:
-                    code = py_file.read_text()
-                    result = detect_security_issues(code)
-                    # Convert SecurityIssue to dict format
-                    for issue in result.issues:
-                        security_issues.append({
-                            "type": "security",
-                            "severity": issue.issue_severity.lower(),
-                            "message": issue.issue_text,
-                            "line": issue.line_number,
-                            "file": str(py_file),
-                            "test_id": issue.test_id,
-                            "cwe_id": issue.cwe_id,
-                        })
-                except Exception:
-                    # Skip files that can't be read/parsed
-                    continue
+                file_audit = self._audit_single_file(py_file, repo_path)
+                if file_audit:  # Skip files that failed to analyze
+                    file_audits.append(file_audit)
 
-            # Analyze complexity across all files
-            complexity_issues = []
+            # Aggregate metrics from file audits
+            all_security_issues = []
+            all_complexity_issues = []
             total_complexity = 0.0
             max_complexity = 0.0
-            function_count = 0
+            total_function_count = 0
 
-            for py_file in python_files:
-                try:
-                    code = py_file.read_text()
-                    result = calculate_complexity(code)
+            for file_audit in file_audits:
+                all_security_issues.extend(file_audit.security_issues)
+                all_complexity_issues.extend(file_audit.complexity_issues)
+                total_complexity += file_audit.avg_complexity * file_audit.function_count
+                max_complexity = max(max_complexity, file_audit.max_complexity)
+                total_function_count += file_audit.function_count
 
-                    for func in result.functions:
-                        function_count += 1
-                        complexity = func.cyclomatic_complexity
-                        total_complexity += complexity
-                        max_complexity = max(max_complexity, complexity)
-
-                        # Flag high complexity functions
-                        if complexity > 10:
-                            complexity_issues.append(
-                                self._create_complexity_issue(func, py_file)
-                            )
-                except Exception:
-                    # Skip files that can't be analyzed
-                    continue
-
-            # Calculate metrics
+            # Calculate commit-level metrics
             avg_complexity = (
-                total_complexity / function_count if function_count > 0 else 0.0
+                total_complexity / total_function_count if total_function_count > 0 else 0.0
             )
-            security_score = self._calculate_security_score(security_issues)
+            security_score = self._calculate_security_score(all_security_issues)
             quality_score = self._calculate_quality_score(
-                security_score, avg_complexity, len(complexity_issues)
+                security_score, avg_complexity, len(all_complexity_issues)
             )
 
             # Count issues by severity
             critical_count = sum(
-                1 for issue in security_issues if issue["severity"] == "critical"
+                1 for issue in all_security_issues if issue["severity"] == "critical"
             )
             high_count = sum(
-                1 for issue in security_issues if issue["severity"] == "high"
-            ) + sum(1 for issue in complexity_issues if issue["severity"] == "high")
+                1 for issue in all_security_issues if issue["severity"] == "high"
+            ) + sum(1 for issue in all_complexity_issues if issue["severity"] == "high")
             medium_count = sum(
-                1 for issue in security_issues if issue["severity"] == "medium"
-            ) + sum(1 for issue in complexity_issues if issue["severity"] == "medium")
+                1 for issue in all_security_issues if issue["severity"] == "medium"
+            ) + sum(1 for issue in all_complexity_issues if issue["severity"] == "medium")
             low_count = sum(
-                1 for issue in security_issues if issue["severity"] == "low"
-            ) + sum(1 for issue in complexity_issues if issue["severity"] == "low")
+                1 for issue in all_security_issues if issue["severity"] == "low"
+            ) + sum(1 for issue in all_complexity_issues if issue["severity"] == "low")
 
             return CommitAudit(
                 commit_sha=commit.sha,
@@ -134,12 +108,13 @@ class AuditEngine:
                 author_email=commit.author_email,
                 date=commit.date,
                 files_changed=commit.files_changed,
-                security_issues=security_issues,
+                files=file_audits,  # NEW: per-file audits
+                security_issues=all_security_issues,
                 security_score=security_score,
-                complexity_issues=complexity_issues,
+                complexity_issues=all_complexity_issues,
                 avg_complexity=avg_complexity,
                 max_complexity=max_complexity,
-                total_issues=len(security_issues) + len(complexity_issues),
+                total_issues=len(all_security_issues) + len(all_complexity_issues),
                 critical_issues=critical_count,
                 high_issues=high_count,
                 medium_issues=medium_count,
@@ -241,6 +216,116 @@ class AuditEngine:
             quality_trend=quality_trend,
             processing_time=processing_time,
         )
+
+    def _audit_single_file(self, file_path: Path, repo_root: str) -> Optional[FileAudit]:
+        """Audit a single file.
+
+        Args:
+            file_path: Path to Python file
+            repo_root: Root of repository (for relative path calculation)
+
+        Returns:
+            FileAudit object or None if file couldn't be analyzed
+        """
+        try:
+            code = file_path.read_text()
+            
+            # Get relative path from repo root
+            relative_path = str(file_path.relative_to(repo_root))
+            
+            # Analyze security
+            security_result = detect_security_issues(code)
+            security_issues = []
+            for issue in security_result.issues:
+                security_issues.append({
+                    "type": "security",
+                    "severity": issue.issue_severity.lower(),
+                    "message": issue.issue_text,
+                    "line": issue.line_number,
+                    "file": relative_path,
+                    "test_id": issue.test_id,
+                    "cwe_id": issue.cwe_id,
+                })
+            
+            # Analyze complexity
+            complexity_result = calculate_complexity(code)
+            complexity_issues = []
+            total_complexity = 0.0
+            max_complexity_val = 0.0
+            function_count = len(complexity_result.functions)
+            
+            for func in complexity_result.functions:
+                complexity = func.cyclomatic_complexity
+                total_complexity += complexity
+                max_complexity_val = max(max_complexity_val, complexity)
+                
+                # Flag high complexity
+                if complexity > 10:
+                    severity = self._get_complexity_severity(complexity)
+                    complexity_issues.append({
+                        "type": "complexity",
+                        "severity": severity,
+                        "message": f"High complexity function '{func.name}' (complexity: {complexity})",
+                        "line": func.lineno,
+                        "file": relative_path,
+                    })
+            
+            # Calculate file metrics
+            avg_complexity_val = total_complexity / function_count if function_count > 0 else 0.0
+            lines_of_code = len(code.splitlines())
+            
+            # Count issues by severity
+            critical_count = sum(1 for i in security_issues if i["severity"] == "critical")
+            high_count = sum(1 for i in security_issues if i["severity"] == "high") + \
+                        sum(1 for i in complexity_issues if i["severity"] == "high")
+            medium_count = sum(1 for i in security_issues if i["severity"] == "medium") + \
+                          sum(1 for i in complexity_issues if i["severity"] == "medium")
+            low_count = sum(1 for i in security_issues if i["severity"] == "low") + \
+                       sum(1 for i in complexity_issues if i["severity"] == "low")
+            
+            # Calculate scores
+            security_score = self._calculate_security_score(security_issues)
+            quality_score = self._calculate_quality_score(
+                security_score, avg_complexity_val, len(complexity_issues)
+            )
+            
+            return FileAudit(
+                file_path=relative_path,
+                security_issues=security_issues,
+                security_score=security_score,
+                complexity_issues=complexity_issues,
+                avg_complexity=avg_complexity_val,
+                max_complexity=max_complexity_val,
+                function_count=function_count,
+                lines_of_code=lines_of_code,
+                total_issues=len(security_issues) + len(complexity_issues),
+                critical_issues=critical_count,
+                high_issues=high_count,
+                medium_issues=medium_count,
+                low_issues=low_count,
+                quality_score=quality_score,
+            )
+        except Exception:
+            # Skip files that can't be analyzed
+            return None
+
+    def _get_complexity_severity(self, complexity: float) -> str:
+        """Determine severity based on complexity value.
+
+        Args:
+            complexity: Cyclomatic complexity value
+
+        Returns:
+            Severity string
+        """
+        if complexity > 20:
+            return "critical"
+        elif complexity > 15:
+            return "high"
+        elif complexity > 10:
+            return "medium"
+        else:
+            return "low"
 
     def _find_python_files(self, repo_path: str) -> List[Path]:
         """Find all Python files in repository.

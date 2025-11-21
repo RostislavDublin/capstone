@@ -6,6 +6,48 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
+class FileAudit(BaseModel):
+    """Audit result for a single file within a commit."""
+
+    file_path: str = Field(description="File path relative to repo root")
+
+    # Security findings for this file
+    security_issues: List[Dict[str, Any]] = Field(
+        default_factory=list, description="Security vulnerabilities in this file"
+    )
+    security_score: float = Field(
+        default=100.0, ge=0.0, le=100.0, description="Security score (100 = perfect)"
+    )
+
+    # Complexity findings for this file
+    complexity_issues: List[Dict[str, Any]] = Field(
+        default_factory=list, description="High complexity functions in this file"
+    )
+    avg_complexity: float = Field(
+        default=0.0, ge=0.0, description="Average cyclomatic complexity"
+    )
+    max_complexity: float = Field(
+        default=0.0, ge=0.0, description="Maximum complexity in this file"
+    )
+    function_count: int = Field(default=0, description="Number of functions analyzed")
+
+    # File-level metrics
+    lines_of_code: int = Field(default=0, description="Lines of code")
+    total_issues: int = Field(default=0, description="Total issues in this file")
+    critical_issues: int = Field(default=0, description="Critical severity count")
+    high_issues: int = Field(default=0, description="High severity count")
+    medium_issues: int = Field(default=0, description="Medium severity count")
+    low_issues: int = Field(default=0, description="Low severity count")
+
+    # File quality score
+    quality_score: float = Field(
+        default=100.0,
+        ge=0.0,
+        le=100.0,
+        description="File quality score (100 = perfect)",
+    )
+
+
 class CommitAudit(BaseModel):
     """Audit result for a single commit."""
 
@@ -15,6 +57,11 @@ class CommitAudit(BaseModel):
     author_email: str = Field(description="Author email")
     date: datetime = Field(description="Commit date")
     files_changed: List[str] = Field(description="List of changed files")
+
+    # Per-file audits (NEW!)
+    files: List[FileAudit] = Field(
+        default_factory=list, description="Per-file audit details"
+    )
 
     # Security findings
     security_issues: List[Dict[str, Any]] = Field(
