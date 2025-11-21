@@ -1,5 +1,5 @@
 ```plantuml
-@startuml deployment
+@startuml quality-guardian-deployment
 !theme plain
 top to bottom direction
 
@@ -33,7 +33,7 @@ skinparam component {
 }
 
 skinparam database {
-  BackgroundColor #FFF4E0
+  BackgroundColor #E3F2FD
   BorderColor #999999
   FontName Arial
   FontSize 11
@@ -44,50 +44,49 @@ skinparam arrow {
   Thickness 2
 }
 
-' Level 1: GitHub
-cloud "GitHub" as github #E8EAF6 {
-  component "Webhooks" as webhooks
-  component "PR API" as pr_api
+' Level 1: User & Git Hosting
+actor "Engineering Lead" as user
+cloud "Git Hosting" as git #E8EAF6 {
+  component "GitHub API" as github_api
+  component "GitLab API" as gitlab_api
+  component "Bitbucket API" as bitbucket_api
 }
 
-' Level 3: Google Cloud Platform
+' Level 2: Google Cloud Platform
 cloud "Google Cloud Platform" as gcp #E3F2FD {
-  package "Cloud Run" as cloudrun {
-    component "Container\n(ADK Runtime)" as container
+  package "Vertex AI Agent Engine" as vertex #E8F5E9 {
+    component "Quality Guardian\nAgent" as qg_agent
+    component "Query Agent" as query_agent
+    component "Gemini 2.0 Flash\n(Command Parsing)" as gemini_flash
+    component "Gemini 2.5 Pro\n(Trend Analysis)" as gemini_pro
   }
   
-  package "Vertex AI" as vertex #E8F5E9 {
-    component "Agent Engine\n(Orchestrator)" as agent_engine
-    component "Gemini API\n(LLM)" as gemini_api
-    component "Memory Bank\n(Pattern Storage)" as memory_bank
+  database "Vertex AI\nRAG Corpus" as rag_corpus {
+    component "Audit History" as audit_history
+    component "Quality Metrics" as quality_metrics
   }
   
-  rectangle components {
-    skinparam rectangle{
-      FontColor transparent
-      BackgroundColor transparent
-      BorderColor transparent
-      shadowing false
-    }
-
-    database "Cloud Storage\n(Memory Persistence)" {
-    }
-    
-    component "Cloud Logging\n(Audit & Debug)" as logging
-    
-    component "Secret Manager\n(Credentials)" as secrets
-    
-    component "Cloud Monitoring\n(Metrics & Alerts)" as monitoring
-    
+  package "Supporting Services" as services {
+    component "Cloud Logging\n(Audit Trail)" as logging
+    component "Secret Manager\n(API Tokens)" as secrets
+    component "Cloud Monitoring\n(Agent Metrics)" as monitoring
     component "IAM\n(Service Account)" as iam
   }
-  
-cloudrun -[hidden]-> components
-
 }
 
-' Force compact vertical layout
-github -[hidden]down-> gcp
+' Connections
+user --> qg_agent : Natural language\ncommands
+qg_agent --> github_api : Fetch commits/repos
+qg_agent --> gitlab_api : (optional)
+qg_agent --> bitbucket_api : (optional)
+qg_agent --> gemini_flash : Parse commands
+qg_agent --> query_agent : Query insights
+query_agent --> rag_corpus : Retrieve audits
+query_agent --> gemini_pro : Trend analysis
+qg_agent --> rag_corpus : Store audits
+qg_agent --> logging : Log operations
+qg_agent --> secrets : Get tokens
+monitoring --> qg_agent : Monitor health
 
 @enduml
 ```

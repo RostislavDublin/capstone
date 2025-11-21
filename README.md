@@ -6,10 +6,10 @@
 [![Track](https://img.shields.io/badge/Track-Enterprise%20Agents-green)]()
 [![Framework](https://img.shields.io/badge/Framework-Google%20ADK-4285F4)]()
 [![Status](https://img.shields.io/badge/Status-In%20Development-yellow)]()
-[![Progress](https://img.shields.io/badge/Progress-Day%201-orange)]()
-[![Days](https://img.shields.io/badge/Days%20Remaining-10-red)]()
+[![Progress](https://img.shields.io/badge/Progress-Day%203-orange)]()
+[![Days](https://img.shields.io/badge/Days%20Remaining-8-red)]()
 
-> **Current Status (Day 1/10):** Architecture redesigned | Quality Guardian concept defined
+> **Current Status (Day 3/10):** Backend tools verified (~15%) | Orchestration layer next
 
 ---
 
@@ -205,95 +205,130 @@ This project demonstrates **6 key concepts** from the Kaggle 5-Day Agents Course
 capstone/
 ├── src/                  # Core implementation
 │   ├── agents/                 # Agent implementations
-│   │   ├── analyzer.py         # Code analysis agent
+│   │   ├── quality_guardian.py # Main orchestrator (stub)
 │   │   └── base.py             # Agent base classes
-│   ├── tools/                  # Analysis tools
-│   │   ├── diff_parser.py      # Git diff parser (7 tests)
-│   │   ├── security_scanner.py # Bandit integration (12 tests)
-│   │   ├── complexity_analyzer.py # Radon metrics (13 tests)
-│   │   └── repo_merger.py      # Merged state creator (10 tests)
-│   ├── models.py               # Pydantic data models
+│   ├── connectors/             # External integrations
+│   │   ├── github.py           # GitHub API (✅ working)
+│   │   └── base.py             # Base connector
+│   ├── audit/                  # Code analysis
+│   │   └── engine.py           # AuditEngine (✅ working)
+│   ├── storage/                # Persistence
+│   │   └── rag_corpus.py       # Vertex AI RAG (stub)
+│   ├── handlers/               # Command handlers
+│   │   └── bootstrap.py        # Bootstrap sampling (✅ working)
+│   ├── audit_models.py         # Audit data models (✅ working)
+│   ├── models.py               # Core data models
 │   └── config.py               # Configuration
 │
-├── tests/                # Test suite (42 tests passing)
-│   ├── unit/                   # Unit tests
-│   │   ├── test_diff_parser.py
-│   │   ├── test_security_scanner.py
-│   │   ├── test_complexity_analyzer.py
-│   │   └── test_repo_merger.py
-│   ├── integration/            # Integration tests (TODO)
-│   ├── e2e/                    # End-to-end tests (TODO)
+├── tests/                # Test suite (188 tests passing)
+│   ├── unit/                   # Unit tests (170 passing)
+│   │   ├── test_changesets.py
+│   │   └── test_memory_bank.py
+│   ├── integration/            # Integration tests (18 passing)
+│   │   ├── test_rag_corpus_integration.py
+│   │   └── test_quality_guardian.py
+│   ├── e2e/                    # End-to-end tests (planned)
 │   └── fixtures/               # Test data
 │       ├── changesets.py       # Test scenarios
+│       ├── mock_pr.py          # Mock PR data
 │       └── test-app/           # Flask app with issues
 │
 ├── demos/                # Interactive demos
 │   ├── README.md               # Demo documentation
-│   └── demo_analyzer.py        # Analyzer Agent demo
+│   └── demo_backend_integration.py  # Backend tools test (✅ working)
 │
 ├── scripts/              # Dev/deploy utilities
-│   ├── deploy_fixture.py
-│   ├── create_test_prs.py
-│   └── reset_fixture.py
+│   ├── setup_dev.sh
+│   ├── run_tests.sh
+│   └── lint.sh
 │
 ├── docs/                 # Documentation
-│   ├── project-plan.md         # 13-day timeline
-│   ├── architecture-overview.md
-│   └── testing-strategy.md
+│   ├── project-plan-v3-quality-guardian.md  # Main plan
+│   ├── architecture-overview.md  # System design
+│   ├── testing-strategy.md       # Testing guide
+│   ├── diagrams/                 # PlantUML diagrams (✅ updated)
+│   └── archive/                  # Old PR Reviewer docs
 │
 └── evalsets/             # Evaluation datasets
     └── test_fixture_prs.evalset.json
-    ├── testing-strategy.md       # Testing guide (300+ lines)
-    ├── unified-testing-architecture.md  # Architecture overview
-    ├── market-trends-2025.md     # Strategic positioning
-    └── capstone-requirements.md  # Competition rubric
 ```
 
-**Legend:**
-- Completed (Days 1-2)
-- TODO: Remaining work (Days 3-14)
+**Status Legend:**
+- ✅ Working (verified with tests/demos)
+- 🚧 In progress
+- ⏳ Planned
 
 ---
 
-## Testing Infrastructure (Day 2 Achievement)
+## Current Implementation Status (Day 3)
 
-### Unified Changeset Architecture
+### ✅ Completed Components (~15%)
 
-**Problem Solved:** Single source of truth for all test scenarios
+**Backend Tools (Days 1-3):**
+- ✅ **GitHubConnector** - GitHub API integration, fetch commits/repos
+- ✅ **AuditEngine** - Security (bandit) + complexity (radon) analysis
+- ✅ **FileAudit models** - Per-file quality tracking with Pydantic
+- ✅ **Bootstrap Handler** - Sampling strategies (recent/tags/date-range)
+- ✅ **Memory Bank** - ADK InMemorySessionService for context
+- ✅ **188 tests passing** - Unit (170) + Integration (18)
+- ✅ **Backend integration demo** - Verified end-to-end tool chain
 
-```python
-# changesets.py - Define once, use everywhere
-CHANGESET_01_SQL_INJECTION = Changeset(
-    id="cs-01-sql-injection",
-    target_file="app/auth.py",
-    new_content="""...SQL injection code...""",
-    expected_issues=[...],
-    pr_title="Add user authentication",
-    min_issues_to_detect=2,
-    max_false_positives=0
-)
-```
+**Documentation:**
+- ✅ Architecture diagrams updated (Quality Guardian concept)
+- ✅ Project plan v3 (10-day timeline)
+- ✅ Testing strategy documented
 
-**Benefits:**
-- ✅ **Local tests:** Generate synthetic diffs without GitHub
-- ✅ **Remote tests:** Create real PRs from same definitions
-- ✅ **Sequential tests:** Memory Bank learning evaluation
-- ✅ **Easy maintenance:** Update once, propagates everywhere
+### 🚧 In Progress (Day 3-4)
 
-**Read more:** [docs/unified-testing-architecture.md](docs/unified-testing-architecture.md)
+**Orchestration Layer:**
+- 🚧 **QualityGuardianAgent** - ADK Agent with command interface
+- 🚧 **RAG Corpus integration** - Vertex AI for persistent storage
+- 🚧 **Command parser** - Parse bootstrap/sync/query intents
 
-### Test Scenarios Ready:
+### ⏳ Planned (Days 4-10)
 
-1. **cs-01-sql-injection** - Security vulnerabilities (2 critical, 1 high)
-2. **cs-02-high-complexity** - Code complexity (3 high, 2 medium)
-3. **cs-03-style-violations** - Style issues (8 medium)
-4. **cs-04-clean-code** - Control test (0 expected issues)
+**Query & Analysis (Days 4-5):**
+- ⏳ Query Agent - RAG retrieval + Gemini trend analysis
+- ⏳ Natural language insights generation
+
+**Multi-Agent Coordination (Days 5-7):**
+- ⏳ Agent-to-agent communication
+- ⏳ Parallel analysis workflows
+
+**Deployment (Days 8-10):**
+- ⏳ Vertex AI Agent Engine deployment
+- ⏳ Production monitoring
+- ⏳ Evaluation suite
 
 ---
 
-## Quick Start (Coming Soon)
+## Quick Start
 
-> **Note:** Agent implementation in progress. This section will be populated with working examples.
+### Run Backend Integration Test
+
+```bash
+# Setup
+python -m venv .venv
+source .venv/bin/activate  # or `.venv\Scripts\activate` on Windows
+pip install -r requirements/dev.txt
+
+# Configure
+cp .env.example .env.dev
+# Edit .env.dev: Add GITHUB_TOKEN, GOOGLE_CLOUD_PROJECT
+
+# Test backend tools
+python demos/demo_backend_integration.py
+```
+
+**Expected output:** Analysis of 2 commits with quality scores, security issues, file-level breakdown.
+
+### Run Tests
+
+```bash
+./scripts/run_tests.sh          # All tests (188 passing)
+pytest tests/unit/              # Unit tests only
+pytest tests/integration/       # Integration tests only
+```
 
 ### Prerequisites
 

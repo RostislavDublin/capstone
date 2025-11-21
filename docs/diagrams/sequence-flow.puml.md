@@ -1,83 +1,101 @@
 ```plantuml
-@startuml sequence-flow
+@startuml quality-guardian-flows
 !theme plain
 
 skinparam sequence {
   ArrowColor #999999
   ActorBorderColor #BBDEFB
   ActorBackgroundColor #E3F2FD
-  ActorFontName Arial
-  ActorFontSize 12
-  ActorFontStyle bold
-  
   ParticipantBorderColor #999999
   ParticipantBackgroundColor #FFF4E0
-  ParticipantFontName Arial
-  ParticipantFontSize 12
-  
   LifeLineBorderColor #CCCCCC
   LifeLineBackgroundColor #F5F5F5
-  
   BoxBorderColor #999999
   BoxBackgroundColor #FAFAFA
 }
 
 skinparam database {
-  BackgroundColor #E8F5E9
+  BackgroundColor #E3F2FD
   BorderColor #999999
 }
 
-actor Developer as dev
-participant "GitHub" as gh
-participant "Orchestrator" as orch
-participant "Repo Merger" as merger
-participant "Analyzer" as ana
-participant "Context" as ctx
-participant "Reporter" as rep
-database "Memory" as mem
+actor "Engineering Lead" as user
+participant "QG Agent" as agent
+participant "GitHub API" as gh
+participant "Audit Engine" as audit
+database "RAG Corpus" as rag
+participant "Query Agent" as query
 
-dev -> gh : Create PR
-gh -> orch : Webhook (PR event)
+== Command 1: Bootstrap (Historical Scan) ==
 
-orch -> gh : Fetch PR diff
-gh --> orch : Diff content
+user -> agent : "Bootstrap myorg/myrepo,\nlast 6 months"
+activate agent
 
-orch -> gh : Clone base repo
-gh --> orch : Base repository
+agent -> gh : List commits\n(tags/time-based/all)
+gh --> agent : [52 commits]
 
-orch -> merger : Apply PR to base
-note right of merger
-  Creates temp directory
-  Applies patch via git apply
-  Returns merged state path
-end note
-merger --> orch : Merged repo path
+loop For each commit
+  agent -> gh : Get commit details
+  gh --> agent : Commit metadata
+  
+  agent -> audit : Audit commit at SHA
+  note right of audit
+    Creates temp checkout
+    Runs bandit (security)
+    Runs radon (complexity)
+    Generates FileAudit per file
+  end note
+  audit --> agent : CommitAudit report
+  
+  agent -> rag : Store audit
+  rag --> agent : Stored
+end
 
-orch -> ana : Analyze(merged_repo_path, changed_files)
-note right of ana
-  Scans COMPLETE files
-  in merged state
-  Not just diff chunks
-end note
-ana --> orch : Security + Complexity Issues
+agent --> user : "✓ Bootstrapped 52 commits\nReady for queries"
+deactivate agent
 
-orch -> ctx : Get Context(merged_repo_path, changed_files)
-note right of ctx
-  Builds dependency graph
-  Finds affected modules
-  Checks integration points
-end note
+== Command 2: Sync (Incremental Update) ==
 
-ctx -> mem : Query patterns
-mem --> ctx : Historical patterns
-ctx --> orch : Integration risks
+user -> agent : "Sync myorg/myrepo"
+activate agent
 
-orch -> rep : Generate Review(all_findings)
-rep -> gh : Post review comment
-rep -> mem : Update patterns
+agent -> rag : Get last audited SHA
+rag --> agent : "abc123 (Nov 18)"
 
-orch -> merger : Cleanup temp repo
-merger --> orch : Done
+agent -> gh : List commits since abc123
+gh --> agent : [3 new commits]
+
+alt New commits found
+  loop For each new commit
+    agent -> audit : Audit commit
+    audit --> agent : CommitAudit
+    agent -> rag : Store audit
+  end
+  
+  agent -> rag : Query trend (before/after)
+  rag --> agent : Quality: 7.2→6.8 (-5.5%)
+  
+  agent --> user : "✓ Synced 3 commits\nQuality degraded 5.5%"
+else No new commits
+  agent --> user : "✓ Up to date"
+end
+
+deactivate agent
+
+== Command 3: Query (Insights) ==
+
+user -> agent : "Show security trends\nfor myorg/myrepo"
+activate agent
+
+agent -> query : Parse query intent
+query -> rag : Retrieve audits\n(focus=security)
+rag --> query : [52 audits]
+
+query -> query : Analyze with Gemini\n(trend analysis)
+query --> agent : Insights + recommendations
+
+agent --> user : "📉 Security degraded 15%\n🔴 SQL injection in 5 audits\n💡 Recommendations..."
+deactivate agent
 
 @enduml
 ```

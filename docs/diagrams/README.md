@@ -1,53 +1,75 @@
-# Architecture Diagrams
+# Architecture Diagrams - Quality Guardian
 
-This directory contains PlantUML diagrams for the AI Code Review Orchestration System.
+**Last Updated:** November 21, 2025 (Day 3)  
+**Status:** ✅ All diagrams updated to Quality Guardian architecture
+
+This directory contains PlantUML diagrams for the Repository Quality Guardian system.
 
 ## Diagrams
 
-### 1. Multi-Agent Architecture (`multi-agent-architecture.puml`)
-Shows the overall system architecture with three specialized agents, tools, and external integrations.
+### 1. Multi-Agent Architecture (`multi-agent-architecture.puml.md`)
+
+Shows the overall system architecture and component relationships.
 
 **Key Components:**
-- Review Orchestrator (event handling, coordination)
-- Analyzer Agent (code analysis, issue detection)
-- Context Agent (history retrieval, pattern matching)
-- Reporter Agent (summary generation, comment formatting)
-- Custom Tools (GitHub API, git parser, static analysis)
-- Memory Bank (persistent storage)
+- Engineering Lead (user)
+- Quality Guardian Agent (orchestrator with Gemini 2.0 Flash)
+- Backend Tools:
+  - GitHub Connector (repo API + commit fetcher)
+  - Audit Engine (bandit + radon + temp checkout)
+  - Query Agent (RAG retrieval + Gemini 2.5 Pro)
+- Vertex AI RAG Corpus (persistent audit storage)
 
-### 2. Sequence Flow (`sequence-flow.puml`)
-Illustrates the complete code review process from PR creation to review posting.
+**Use Case:** Understanding high-level architecture
+
+---
+
+### 2. Sequence Flow (`sequence-flow.puml.md`)
+
+Illustrates three command workflows: bootstrap, sync, and query.
 
 **Flow Stages:**
-1. PR Creation & Webhook
-2. Parallel Analysis (Analyzer + Context)
-3. Results Aggregation
-4. Report Generation
-5. Memory Update
-6. GitHub Posting
-7. Learning Loop (feedback)
 
-**Timing:** Total < 15 seconds
+**Command 1: Bootstrap** (Historical Scan)
+1. User requests bootstrap with time range
+2. Agent fetches commit list from GitHub
+3. Agent audits each commit with AuditEngine
+4. Agent stores audits in RAG Corpus
+5. Agent returns summary to user
 
-### 3. Memory System (`memory-system.puml`)
-Details the Memory Bank architecture for context retention and learning.
+**Command 2: Sync** (Incremental Update)
+1. Agent queries RAG for last audited SHA
+2. Agent fetches new commits from GitHub
+3. Agent audits new commits
+4. Agent calculates quality delta
+5. Agent returns trend metrics
 
-**Components:**
-- Pattern Storage (review patterns, acceptance rates)
-- Team Knowledge (coding standards, best practices)
-- Historical Data (previous reviews, changes)
-- Learning Module (feedback processing, weight adjustment)
+**Command 3: Query** (Insights)
+1. User asks about quality trends
+2. Query Agent retrieves relevant audits from RAG
+3. Query Agent analyzes with Gemini
+4. Agent returns insights + recommendations
 
-**Storage Types:**
-- Session Store (in-memory, temporary)
-- Persistent Store (Memory Bank, long-term)
+---
 
-### 4. Deployment Architecture (`deployment.puml`)
+### 3. Memory System (`memory-system.puml.md`)
+
+**Note:** This diagram is from Day 1 Memory Bank implementation. The concept evolved into RAG Corpus for Quality Guardian, but the ADK InMemorySessionService pattern is still used for session state.
+
+**Status:** Kept for reference (original implementation)
+
+---
+
+### 4. Deployment Architecture (`deployment.puml.md`)
+
 Production deployment on Google Cloud Platform.
 
 **Infrastructure:**
-- Vertex AI Agent Engine
-- Cloud Run (container runtime)
+- Vertex AI Agent Engine (Quality Guardian + Query Agent)
+- Gemini 2.0 Flash (command parsing)
+- Gemini 2.5 Pro (trend analysis)
+- Vertex AI RAG Corpus (audit history)
+- Supporting Services (Logging, Secrets, Monitoring, IAM)
 - Cloud Storage (Memory Bank)
 - Cloud Logging (observability)
 - Gemini API (LLM backend)
