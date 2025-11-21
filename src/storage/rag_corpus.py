@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 import vertexai
 from vertexai.preview import rag
 
-from ..audit_models import CommitAudit, RepositoryAudit
+from audit_models import CommitAudit, RepositoryAudit
 
 logger = logging.getLogger(__name__)
 

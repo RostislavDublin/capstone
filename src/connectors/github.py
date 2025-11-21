@@ -79,8 +79,13 @@ class GitHubConnector(RepositoryConnector):
         repo = self._get_repository(repo_identifier)
         sha = branch if branch else repo.default_branch
 
-        # PyGithub get_commits accepts since/until
-        commits = repo.get_commits(sha=sha, since=since, until=until)
+        # PyGithub get_commits - only pass since/until if they are provided
+        kwargs = {"sha": sha}
+        if since is not None:
+            kwargs["since"] = since
+        if until is not None:
+            kwargs["until"] = until
+        commits = repo.get_commits(**kwargs)
 
         result = []
         for commit in commits:

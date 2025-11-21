@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timedelta
 from typing import Optional, Tuple, Union
 
-from src.audit_models import BootstrapCommand, QualityQuery, SyncCommand
+from audit_models import BootstrapCommand, QualityQuery, SyncCommand
 
 
 class CommandParser:

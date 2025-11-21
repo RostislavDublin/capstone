@@ -192,12 +192,13 @@ def test_store_commit_audit_real(rag_manager, sample_commit_audit, vertexai_init
     
     # Store commit audit
     print("\n2️⃣  Uploading commit audit...")
-    rag_file = rag_manager.store_commit_audit(sample_commit_audit)
-    
-    assert rag_file is not None
-    assert rag_file.display_name == "commit_integra.json"  # First 7 chars of SHA
-    print(f"✅ Commit audit stored: {rag_file.name}")
-    print(f"   Display name: {rag_file.display_name}")
+    result = rag_manager.store_commit_audit(sample_commit_audit, store_files_separately=False)
+
+    assert result is not None
+    assert 'commit' in result
+    assert result['commit'].display_name == "commit_integra.json"  # First 7 chars of SHA
+    print(f"✅ Commit audit stored: {result['commit'].name}")
+    print(f"   Display name: {result['commit'].display_name}")
     
     # Wait for indexing
     print("\n⏳ Waiting for indexing (5 seconds)...")
@@ -406,14 +407,14 @@ def test_full_workflow_integration(rag_manager, sample_commit_audit, sample_repo
     print("─" * 70)
     
     print("   Storing commit audit 1...")
-    rag_file1 = rag_manager.store_commit_audit(sample_commit_audit)
-    print(f"   ✅ Stored: {rag_file1.display_name}")
+    result1 = rag_manager.store_commit_audit(sample_commit_audit, store_files_separately=False)
+    print(f"   ✅ Stored: {result1['commit'].display_name}")
     
     print("   Storing commit audit 2 (modified)...")
     sample_commit_audit.commit_sha = "integration-test-sha-67890"
     sample_commit_audit.quality_score = 85.0
-    rag_file2 = rag_manager.store_commit_audit(sample_commit_audit)
-    print(f"   ✅ Stored: {rag_file2.display_name}")
+    result2 = rag_manager.store_commit_audit(sample_commit_audit, store_files_separately=False)
+    print(f"   ✅ Stored: {result2['commit'].display_name}")
     
     print("   Storing repository audit...")
     rag_file3 = rag_manager.store_repository_audit(sample_repository_audit)

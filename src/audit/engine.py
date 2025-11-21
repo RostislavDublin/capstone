@@ -5,10 +5,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from src.audit_models import CommitAudit, FileAudit, RepositoryAudit
-from src.connectors.base import CommitInfo, RepositoryConnector
-from src.tools.complexity_analyzer import calculate_complexity
-from src.tools.security_scanner import detect_security_issues
+from audit_models import CommitAudit, FileAudit, RepositoryAudit
+from connectors.base import CommitInfo, RepositoryConnector
+from tools.complexity_analyzer import calculate_complexity
+from tools.security_scanner import detect_security_issues
 
 
 class AuditEngine:

@@ -4,9 +4,9 @@ import logging
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from src.audit.engine import AuditEngine
-from src.audit_models import BootstrapCommand, CommandResult, RepositoryAudit
-from src.connectors.base import CommitInfo, RepositoryConnector
+from audit.engine import AuditEngine
+from audit_models import BootstrapCommand, CommandResult, RepositoryAudit
+from connectors.base import CommitInfo, RepositoryConnector
 
 logger = logging.getLogger(__name__)
 

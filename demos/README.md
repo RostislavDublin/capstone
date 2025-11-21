@@ -43,6 +43,66 @@ Step 4: Analyzing code complexity...
 Step 5: Generating AI recommendations...
 ```
 
+---
+
+### `demo_backend_integration.py`
+**Backend Integration Test - GitHubConnector + AuditEngine**
+
+**⚠️ Scope: Backend tools integration test only**
+- Tests GitHubConnector API integration
+- Tests AuditEngine (security + complexity analysis)
+- Tests FileAudit models (per-file tracking)
+- **NOT TESTED:** ADK Agent, RAG Corpus, orchestration layer
+
+**Запуск:**
+```bash
+cd /Users/Rostislav_Dublin/src/drs/ai/capstone
+python demos/demo_backend_integration.py
+```
+
+**Требования:**
+- GitHub token в `.env.dev`: `GITHUB_TOKEN`
+- Google Cloud credentials (for temp checkouts only, RAG not used yet)
+
+**Что демонстрируется:**
+```
+╔══════════════════════════════════════════════════════════════════╗
+║         🔍 QUALITY GUARDIAN AGENT DEMONSTRATION 🔍               ║
+╚══════════════════════════════════════════════════════════════════╝
+
+DEMO 1: Component Integration
+   ✓ GitHub Connector - connects to RostislavDublin/capstone
+   ✓ Bootstrap Handler - samples commits (recent/tags/date-range)
+   ✓ Audit Engine - analyzes code quality and security
+   ✓ RAG Storage Manager - stores audits in Vertex AI
+
+DEMO 2: Bootstrap Workflow (Historical Scan)
+   Command: 'bootstrap RostislavDublin/capstone strategy=recent count=3'
+   ✅ Analyzed 3 commits
+   📊 Commit Details:
+      1. 880a499 - feat: Add Memory Bank implementation
+         Files: 5, Lines: +234/-12
+         File breakdown:
+           • src/memory/schema.py (+145/-0)
+           • tests/unit/test_memory_bank.py (+89/-0)
+
+DEMO 3: Sync Workflow (Incremental Updates)
+   Command: 'sync RostislavDublin/capstone'
+   ✅ Repository is up to date!
+   Last audited commit: 880a499
+```
+
+**Архитектура:**
+```
+QualityGuardianAgent (orchestrator)
+├── RepositoryConnector → GitHub API
+├── BootstrapHandler → Sampling strategies
+├── AuditEngine → Security + Quality analysis
+└── RAGCorpusManager → Vertex AI RAG storage
+```
+
+---
+
 ## Как добавить новое демо
 
 1. Создай скрипт `demo_*.py` в этой папке
