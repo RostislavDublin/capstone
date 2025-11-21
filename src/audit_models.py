@@ -1,11 +1,9 @@
 """Models for Quality Guardian - audit reports and metrics."""
 
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
-
-from .models import CodeIssue, IssueType, Severity
 
 
 class CommitAudit(BaseModel):
@@ -19,7 +17,7 @@ class CommitAudit(BaseModel):
     files_changed: List[str] = Field(description="List of changed files")
 
     # Security findings
-    security_issues: List[CodeIssue] = Field(
+    security_issues: List[Dict[str, Any]] = Field(
         default_factory=list, description="Security vulnerabilities"
     )
     security_score: float = Field(
@@ -27,7 +25,7 @@ class CommitAudit(BaseModel):
     )
 
     # Complexity findings
-    complexity_issues: List[CodeIssue] = Field(
+    complexity_issues: List[Dict[str, Any]] = Field(
         default_factory=list, description="High complexity functions/classes"
     )
     avg_complexity: float = Field(
@@ -127,7 +125,7 @@ class QualityInsight(BaseModel):
     )
     title: str = Field(description="Short insight title")
     description: str = Field(description="Detailed explanation")
-    severity: Severity = Field(description="Importance level")
+    severity: str = Field(description="Importance level: critical, high, medium, low")
     evidence: List[str] = Field(
         description="Supporting evidence (commit SHAs, dates, metrics)"
     )
