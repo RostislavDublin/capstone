@@ -1,23 +1,23 @@
-"""AI Code Review Orchestration System.
+"""Repository Quality Guardian.
 
-Multi-agent system for automated code review using Google ADK and Gemini.
+Multi-agent system for independent quality auditing using Google ADK and Gemini.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "Rostislav Dublin"
 
 from .config import AppConfig
 from .models import (
-    PullRequest,
-    CodeChange,
-    ReviewIssue,
-    ReviewSummary,
+    CodeIssue,
+    CodeLocation,
+    IssueType,
+    Severity,
 )
 
 __all__ = [
-    "Config",
-    "PullRequest",
-    "CodeChange",
-    "ReviewIssue",
-    "ReviewSummary",
+    "AppConfig",
+    "CodeIssue",
+    "CodeLocation",
+    "IssueType",
+    "Severity",
 ]
