@@ -8,9 +8,8 @@ This agent provides:
 """
 
 from typing import Optional
-
-from google import genai
-from google.genai import types
+import vertexai
+from vertexai.generative_models import GenerativeModel
 
 from tools.dependency_analyzer import (
     analyze_impact,
@@ -27,16 +26,15 @@ class ContextAgent:
     
     def __init__(
         self,
-        model_name: str = "gemini-2.0-flash-exp",
+        model_name: str = "gemini-2.0-flash-001",
         memory_bank: Optional[MemoryBank] = None
     ):
         """Initialize context agent.
         
         Args:
-            model_name: Gemini model to use
+            model_name: Gemini model to use (Vertex AI)
             memory_bank: Optional Memory Bank for pattern recognition
         """
-        self.client = genai.Client()
         self.model_name = model_name
         self.memory = memory_bank or MemoryBank()
         
@@ -153,13 +151,13 @@ Provide insights about:
 Focus on practical, actionable insights."""
         
         try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=0.3,
-                    max_output_tokens=1000
-                )
+            model = GenerativeModel(self.model_name)
+            response = model.generate_content(
+                prompt,
+                generation_config={
+                    "temperature": 0.3,
+                    "max_output_tokens": 1000
+                }
             )
             return response.text
         except Exception as e:

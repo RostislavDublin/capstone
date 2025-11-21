@@ -1,14 +1,19 @@
-"""Quality Guardian Agent - Main orchestrator for repository quality analysis.
+"""Quality Guardian Agent - ADK Agent orchestrating repository quality analysis.
 
-Coordinates all components to execute bootstrap, sync, and query commands.
+Uses Google ADK Agent with Gemini to parse natural language commands and coordinate
+backend tools: GitHubConnector, AuditEngine, RAG Corpus.
 """
 
 import logging
-from typing import Optional
+import os
+from typing import Any, Dict, List, Optional
 
-from audit_models import BootstrapCommand, CommandResult, RepositoryAudit, SyncCommand
+from google import genai
+from google.genai import types
+
+from audit_models import CommitAudit
 from audit.engine import AuditEngine
-from connectors.base import RepositoryConnector
+from connectors.github import GitHubConnector
 from handlers.bootstrap import BootstrapHandler
 from storage.rag_corpus import RAGCorpusManager
 
@@ -16,51 +21,65 @@ logger = logging.getLogger(__name__)
 
 
 class QualityGuardianAgent:
-    """Main agent orchestrating repository quality analysis.
+    """ADK Agent orchestrating repository quality analysis.
     
-    Executes commands:
-    - bootstrap: Historical scan of repository
-    - sync: Incremental update with new commits
-    - query: Natural language queries about quality (coming soon)
+    Natural language interface for three commands:
+    - bootstrap: "Scan facebook/react using tags from 2024"
+    - sync: "Check myorg/myrepo for new commits"  
+    - query: "Show security trends for myorg/myrepo"
     
     Architecture:
-        Command → Bootstrap/Sync Handler → Audit Engine → RAG Storage
+        User Command (NL) → Gemini Agent → Tool Functions → RAG Storage
     
     Example:
-        >>> agent = QualityGuardianAgent(connector, rag_manager)
-        >>> result = agent.execute_bootstrap(
-        ...     repo="owner/repo",
-        ...     strategy="tags"
+        >>> agent = QualityGuardianAgent()
+        >>> response = agent.process_command(
+        ...     "Bootstrap myorg/myrepo using recent strategy, last 6 months"
         ... )
-        >>> print(result.message)
-        "✓ Bootstrapped owner/repo (15 commits audited)"
+        >>> print(response)
+        "✓ Bootstrapped myorg/myrepo (52 commits audited)"
     """
 
     def __init__(
         self,
-        connector: RepositoryConnector,
-        rag_manager: RAGCorpusManager,
-        audit_engine: Optional[AuditEngine] = None,
-        bootstrap_handler: Optional[BootstrapHandler] = None,
+        github_token: Optional[str] = None,
+        google_project: Optional[str] = None,
+        vertex_location: Optional[str] = None,
+        model_name: str = "gemini-2.0-flash-exp",
     ):
-        """Initialize Quality Guardian Agent.
+        """Initialize Quality Guardian Agent with ADK.
         
         Args:
-            connector: Repository connector (GitHub, GitLab, etc.)
-            rag_manager: RAG corpus manager for storage
-            audit_engine: Optional pre-configured audit engine
-            bootstrap_handler: Optional pre-configured bootstrap handler
+            github_token: GitHub API token (or from GITHUB_TOKEN env var)
+            google_project: GCP project ID (or from GOOGLE_CLOUD_PROJECT)
+            vertex_location: Vertex AI location (or from VERTEX_LOCATION)
+            model_name: Gemini model for command parsing
         """
-        self.connector = connector
-        self.rag_manager = rag_manager
+        # Get credentials from environment if not provided
+        self.github_token = github_token or os.getenv("GITHUB_TOKEN", "")
+        self.google_project = google_project or os.getenv("GOOGLE_CLOUD_PROJECT", "")
+        self.vertex_location = vertex_location or os.getenv("VERTEX_LOCATION", "us-west1")
         
-        # Create audit engine if not provided
-        self.audit_engine = audit_engine or AuditEngine(connector)
+        if not self.github_token:
+            raise ValueError("GitHub token required (GITHUB_TOKEN env var or github_token parameter)")
         
-        # Create bootstrap handler if not provided
-        self.bootstrap_handler = bootstrap_handler or BootstrapHandler(
-            connector, self.audit_engine
+        # Initialize backend components
+        self.connector = GitHubConnector(token=self.github_token)
+        self.audit_engine = AuditEngine()
+        self.bootstrap_handler = BootstrapHandler(self.connector, self.audit_engine)
+        self.rag_manager = RAGCorpusManager(
+            project_id=self.google_project,
+            location=self.vertex_location
         )
+        
+        # Initialize Gemini client for command parsing
+        self.client = genai.Client()
+        self.model_name = model_name
+        
+        logger.info(f"✅ Quality Guardian Agent initialized")
+        logger.info(f"   Model: {model_name}")
+        logger.info(f"   GitHub: Connected")
+        logger.info(f"   RAG: {google_project} ({vertex_location})")
 
     def execute_bootstrap(
         self,

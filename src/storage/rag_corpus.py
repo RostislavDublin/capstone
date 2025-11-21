@@ -104,16 +104,17 @@ class RAGCorpusManager:
         self,
         audit: CommitAudit,
         display_name: Optional[str] = None,
-        store_files_separately: bool = True,
+        store_files_separately: bool = False,
     ) -> Dict[str, rag.RagFile]:
         """Store CommitAudit in RAG Corpus.
         
-        Uploads both commit-level and file-level documents for granular queries.
+        Stores ONE document per commit with all file audits embedded inside.
+        This is efficient: 1 upload per commit instead of 100+ uploads.
         
         Args:
             audit: CommitAudit instance to store
             display_name: Optional display name (default: commit_{sha[:7]}.json)
-            store_files_separately: If True, also index each file separately (default: True)
+            store_files_separately: If True, also index each file separately (NOT RECOMMENDED - slow!)
             
         Returns:
             Dict with 'commit' RagFile and optional 'files' list
@@ -126,10 +127,22 @@ class RAGCorpusManager:
 
         uploaded_files = {}
 
-        # 1. Store commit-level document (as before)
-        audit_json = audit.model_dump_json(indent=2)
+        # Check if commit already exists (avoid duplicates)
         if display_name is None:
             display_name = f"commit_{audit.commit_sha[:7]}.json"
+        
+        try:
+            existing_files = list(rag.list_files(corpus_name=self._corpus_resource_name))
+            for existing in existing_files:
+                if existing.display_name == display_name:
+                    logger.info(f"Commit {audit.commit_sha[:7]} already exists in corpus, skipping")
+                    uploaded_files['commit'] = existing
+                    return uploaded_files
+        except Exception as e:
+            logger.warning(f"Could not check for existing files: {e}")
+
+        # 1. Store commit-level document (as before)
+        audit_json = audit.model_dump_json(indent=2)
 
         commit_file = self._upload_json(
             json_content=audit_json,
@@ -168,7 +181,9 @@ class RAGCorpusManager:
                     logger.warning(f"Failed to upload file audit for {file_audit.file_path}: {e}")
 
             uploaded_files['files'] = file_uploads
-            logger.info(f"Stored commit audit with {len(file_uploads)} file audits")
+            logger.info(f"Stored commit audit with {len(file_uploads)} file audits separately")
+        else:
+            logger.info(f"Stored commit audit (files embedded, count: {len(audit.files) if audit.files else 0})")
 
         return uploaded_files
 
@@ -258,31 +273,97 @@ class RAGCorpusManager:
         repository: str,
         audit_type: str = "commit",
     ) -> Optional[Dict]:
-        """Get most recent audit for a repository.
+        """Get most recent audit for a repository using RAG semantic search.
+        
+        This method asks RAG a natural language question and lets it find
+        the answer from stored commit audits based on document content (dates, SHAs).
         
         Args:
             repository: Repository name (e.g., "acme/web-app")
             audit_type: Type of audit ("commit" or "repository")
             
         Returns:
-            Latest audit data or None if not found
-            
-        Note:
-            This is a placeholder. Full implementation requires:
-            - Metadata filtering in RAG queries
-            - Timestamp-based sorting
-            Currently uses semantic search as approximation.
+            Dict with commit_sha and date, or None if not found
         """
         if self._corpus_resource_name is None:
             raise RuntimeError("Corpus not initialized. Call initialize_corpus() first.")
 
-        # Use semantic search to find latest audit
-        query = f"Latest {audit_type} audit for {repository}"
-        results = self.query_audits(query, top_k=1)
-
-        if results:
-            return results[0]
-        return None
+        try:
+            # Ask RAG to find commits for this repository
+            # It will search through commit audit JSONs and find matching ones
+            query = f"Show me commit audits for repository {repository}. I need the most recent commit SHA and date."
+            
+            results = self.query_audits(query, top_k=10)
+            
+            logger.debug(f"RAG query returned {len(results) if results else 0} results for {repository}")
+            
+            if not results:
+                logger.debug(f"No results from RAG for repository {repository}")
+                return None
+            
+            # Parse results to extract commit info
+            # Results contain text chunks from commit audit JSONs
+            import json
+            import re
+            
+            commits = []
+            seen_shas = set()  # Avoid duplicates (same commit in multiple chunks)
+            
+            for i, result in enumerate(results):
+                text = result.get("text", "")
+                
+                # RAG returns text chunks, not full JSONs - parse with regex
+                # Look for patterns like: "commit_sha": "abc123..." or commit_sha abc123...
+                sha_patterns = [
+                    r'"commit_sha":\s*"([a-f0-9]{7,40})"',  # JSON format
+                    r'commit_sha[:\s]+([a-f0-9]{7,40})',     # Text format
+                ]
+                date_patterns = [
+                    r'"date":\s*"([^"]+)"',                  # JSON format
+                    r'date[:\s]+"?([0-9]{4}-[0-9]{2}-[0-9]{2}[T\s][^"\n]+)',  # Text format
+                ]
+                
+                sha_match = None
+                for pattern in sha_patterns:
+                    sha_match = re.search(pattern, text)
+                    if sha_match:
+                        break
+                
+                date_match = None
+                for pattern in date_patterns:
+                    date_match = re.search(pattern, text)
+                    if date_match:
+                        break
+                
+                if sha_match and date_match:
+                    sha = sha_match.group(1)
+                    if sha not in seen_shas:
+                        commits.append({
+                            "commit_sha": sha,
+                            "date": date_match.group(1).strip('"'),
+                        })
+                        seen_shas.add(sha)
+                        logger.debug(f"Parsed commit from chunk {i}: {sha[:8]}")
+                    else:
+                        logger.debug(f"Chunk {i} has no complete commit info")
+            
+            logger.debug(f"Successfully parsed {len(commits)} commits from RAG results")
+            
+            if not commits:
+                logger.debug("No commits could be parsed from RAG results")
+                return None            # Sort by date (most recent first)
+            from datetime import datetime
+            commits_sorted = sorted(
+                commits,
+                key=lambda c: datetime.fromisoformat(c["date"].replace("Z", "+00:00")),
+                reverse=True
+            )
+            
+            return commits_sorted[0]
+            
+        except Exception as e:
+            logger.error(f"Failed to get latest audit: {e}")
+            return None
 
     def delete_corpus(self) -> None:
         """Delete the entire RAG Corpus and all stored audits.

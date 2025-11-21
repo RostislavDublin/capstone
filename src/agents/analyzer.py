@@ -1,14 +1,14 @@
-"""Analyzer Agent - intelligent code analysis agent using ADK.
+"""Analyzer Agent - intelligent code analysis agent.
 
 This agent analyzes pull requests by:
 1. Parsing git diffs to extract changes
 2. Running security scans on added code
 3. Analyzing code complexity
-4. Using Gemini to synthesize findings and provide recommendations
+4. Using Vertex AI Gemini to synthesize findings and provide recommendations
 """
 
-from google import genai
-from google.genai import types
+import vertexai
+from vertexai.generative_models import GenerativeModel
 
 from tools.diff_parser import parse_git_diff, get_added_code_blocks
 from tools.security_scanner import detect_security_issues, format_security_report
@@ -19,13 +19,12 @@ from tools.repo_merger import create_merged_repository, cleanup_merged_repositor
 class AnalyzerAgent:
     """Intelligent code analysis agent using Google ADK."""
     
-    def __init__(self, model_name: str = "gemini-2.0-flash-exp"):
+    def __init__(self, model_name: str = "gemini-2.0-flash-001"):
         """Initialize the analyzer agent.
         
         Args:
-            model_name: Gemini model to use (flash for speed, pro for complexity)
+            model_name: Gemini model to use (Vertex AI - flash for speed, pro for complexity)
         """
-        self.client = genai.Client()
         self.model_name = model_name
         
     def analyze_pull_request(self, diff_text: str, base_repo_path: str = None) -> dict:
@@ -223,13 +222,13 @@ Be concise, specific, and focus on the most important issues.
 Provide your analysis:"""
         
         try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=0.3,  # Lower temperature for consistent, factual analysis
-                    max_output_tokens=800
-                )
+            model = GenerativeModel(self.model_name)
+            response = model.generate_content(
+                prompt,
+                generation_config={
+                    "temperature": 0.3,
+                    "max_output_tokens": 800
+                }
             )
             return response.text
         except Exception as e:

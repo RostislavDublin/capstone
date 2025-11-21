@@ -1,20 +1,18 @@
 """
-Proof-of-concept: Google Context Caching API exploration
+"""Proof-of-concept: Context Caching with Vertex AI
 
 Tests basic cache operations to understand the API before integration.
 """
 
-from google import genai
-from google.genai import types
+import vertexai
+from vertexai.generative_models import GenerativeModel
 import json
 from datetime import datetime, timezone
 
 def main():
     print("=" * 80)
-    print("Context Caching API - Proof of Concept")
+    print("Context Caching API - Proof of Concept (Vertex AI)")
     print("=" * 80)
-    
-    client = genai.Client()
     
     # Test 1: Create a cache
     print("\n1. Creating cache for baseline review...")
