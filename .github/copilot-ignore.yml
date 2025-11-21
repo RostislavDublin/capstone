@@ -1,0 +1,6 @@
+# Disable GitHub Copilot for this repository
+# This repository is used for testing AI Code Review Bot
+# and should not have Copilot interference
+
+# Ignore all files
+**/*
