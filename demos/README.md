@@ -1,44 +1,44 @@
 # Demo Scripts
 
-Интерактивные демонстрационные скрипты для ручного тестирования и проверки функциональности системы AI Code Review.
+Interactive demonstration scripts for manual testing and validation of the AI Code Review system.
 
-## Что здесь
+## What's Here
 
-Эта папка содержит скрипты для **ручной проверки и демонстрации**, которые:
-- Показывают работу системы в действии
-- Полезны для отладки и разработки
-- Используют реальные API (Gemini, GitHub, Vertex AI)
-- **НЕ являются автоматическими тестами** (для этого есть `tests/`)
+This folder contains scripts for **manual testing and demonstration** that:
+- Show the system in action
+- Help with debugging and development
+- Use real APIs (Gemini, GitHub, Vertex AI)
+- **Are NOT automated tests** (use `tests/` for that)
 
-## 🟢 Рабочие демо
+## 🟢 Working Demos
 
-### 1. `demo_quality_guardian_agent.py` ⭐ **ГЛАВНЫЙ**
+### 1. `demo_quality_guardian_agent.py` ⭐ **MAIN**
 **ADK Multi-Agent Implementation - Production-Ready Architecture**
 
-Демонстрирует полную работу Quality Guardian Agent с использованием Google ADK:
+Demonstrates full Quality Guardian Agent workflow using Google ADK:
 - Natural language commands → ADK Agent → Tool execution
-- RAG Corpus integration (Vertex AI) для persistent storage
+- RAG Corpus integration (Vertex AI) for persistent storage
 - Bootstrap → Sync → Query workflow
 - GitHub API integration (real repository commits)
 
-**Запуск:**
+**Usage:**
 ```bash
 cd /Users/Rostislav_Dublin/src/drs/ai/capstone
 python demos/demo_quality_guardian_agent.py 1
 ```
 
-**Режимы:**
-- Mode 1: Интерактивное меню (все 4 теста подряд)
+**Modes:**
+- Mode 1: Interactive menu (all 4 tests sequentially)
 - Mode 2: Bootstrap only (analyze N commits)
 - Mode 3: Sync only (check for new commits)
 - Mode 4: Query only (ask questions about audits)
 
-**Требования:**
-- GitHub token: `GITHUB_TOKEN` в `.env.dev`
+**Requirements:**
+- GitHub token: `GITHUB_TOKEN` in `.env.dev`
 - Google Cloud project: `GOOGLE_CLOUD_PROJECT`
 - Test repository: `RostislavDublin/capstone-test-fixture`
 
-**Пример вывода:**
+**Example output:**
 ```
 ✅ Loaded environment from .env.dev
 
@@ -65,23 +65,23 @@ TEST 4: Agent Capabilities
 ### 2. `demo_memory.py`
 **Memory Bank - Pattern Learning and Recognition**
 
-Демонстрирует как Memory Bank:
-- Хранит review patterns из code reviews
-- Отслеживает частоту и acceptance rate паттернов
-- Хранит team coding standards
-- Вспоминает похожие паттерны during reviews
-- Предоставляет статистику по выученным паттернам
+Demonstrates how Memory Bank:
+- Stores review patterns from code reviews
+- Tracks frequency and acceptance rate of patterns
+- Stores team coding standards
+- Recalls similar patterns during reviews
+- Provides statistics on learned patterns
 
-**Запуск:**
+**Usage:**
 ```bash
 cd /Users/Rostislav_Dublin/src/drs/ai/capstone
 python demos/demo_memory.py
 ```
 
-**Требования:**
-- Нет внешних зависимостей (использует in-memory storage)
+**Requirements:**
+- No external dependencies (uses in-memory storage)
 
-**Что демонстрируется:**
+**What's demonstrated:**
 ```
 ================================================================================
                      SCENARIO 1: Learning from Code Reviews                     
@@ -107,30 +107,30 @@ SCENARIO 3: Pattern Statistics
 
 ---
 
-## 🔴 Устаревшие/сломанные демо
+## 🔴 Deprecated/Broken Demos
 
 ### `demo_context_caching.py`
-**Статус:** ❌ Не работает (синтаксическая ошибка + устаревший API)
+**Status:** ❌ Not working (syntax error + deprecated API)
 
-**Проблемы:**
-- Написан для старого API (не Vertex AI)
-- Использует несуществующий `client.caches.create()`
-- Proof-of-concept, не интегрирован с текущей архитектурой
+**Issues:**
+- Written for old API (not Vertex AI)
+- Uses non-existent `client.caches.create()`
+- Proof-of-concept, not integrated with current architecture
 
-**Рекомендация:** Удалить или переписать для Vertex AI Context Caching API
+**Recommendation:** Delete or rewrite for Vertex AI Context Caching API
 └── RAGCorpusManager → Vertex AI RAG storage
 ```
 
 ---
 
-## Как добавить новое демо
+## How to Add New Demo
 
-1. Создай скрипт `demo_*.py` в этой папке
-2. Добавь docstring с описанием и примером запуска
-3. Добавь секцию в этот README
-4. Используй `sys.path.insert(0, str(Path(__file__).parent.parent / "src"))` для импортов
+1. Create script `demo_*.py` in this folder
+2. Add docstring with description and usage example
+3. Add section to this README
+4. Use `sys.path.insert(0, str(Path(__file__).parent.parent / "src"))` for imports
 
-**Шаблон:**
+**Template:**
 ```python
 """Demo script for [feature name].
 
@@ -155,15 +155,15 @@ if __name__ == "__main__":
     main()
 ```
 
-## Важно
+## Important Notes
 
-- **Не коммитить API ключи** в скрипты
-- Демо **НЕ запускаются** в CI/CD
-- Для автоматического тестирования используй `tests/`
-- Демо могут **требовать external services** (Gemini API, GitHub API)
+- **Do NOT commit API keys** in scripts
+- Demos **are NOT run** in CI/CD
+- For automated testing use `tests/`
+- Demos may **require external services** (Gemini API, GitHub API)
 
-## См. также
+## See Also
 
-- `tests/` - автоматические тесты (pytest)
-- `scripts/` - утилиты для разработки и деплоя
-- `docs/testing-strategy.md` - стратегия тестирования
+- `tests/` - automated tests (pytest)
+- `scripts/` - development and deployment utilities
+- `docs/testing-strategy.md` - testing strategy
