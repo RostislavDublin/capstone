@@ -365,10 +365,43 @@ class RAGCorpusManager:
             logger.error(f"Failed to get latest audit: {e}")
             return None
 
+    def clear_all_files(self) -> int:
+        """Delete all files from corpus without deleting the corpus itself.
+        
+        More efficient than delete_corpus() + initialize_corpus() for cleanup.
+        
+        Returns:
+            Number of files deleted
+            
+        Raises:
+            RuntimeError: If file deletion fails
+        """
+        if self._corpus_resource_name is None:
+            logger.warning("No corpus to clear (not initialized)")
+            return 0
+
+        try:
+            files = list(rag.list_files(corpus_name=self._corpus_resource_name))
+            count = len(files)
+            
+            if count == 0:
+                logger.info("Corpus is already empty")
+                return 0
+            
+            logger.info(f"Deleting {count} file(s) from corpus...")
+            for file in files:
+                rag.delete_file(name=file.name)
+            
+            logger.info(f"Cleared {count} file(s) from corpus")
+            return count
+        except Exception as e:
+            raise RuntimeError(f"Failed to clear corpus files: {e}") from e
+
     def delete_corpus(self) -> None:
         """Delete the entire RAG Corpus and all stored audits.
         
         WARNING: This is destructive and cannot be undone!
+        Use clear_all_files() if you only want to remove files but keep the corpus.
         
         Raises:
             RuntimeError: If deletion fails

@@ -253,3 +253,46 @@ def reset_test_repo() -> str:
 def delete_test_repo() -> None:
     """Delete test repository."""
     get_fixture().delete()
+
+
+def add_test_commits(count: int = 1) -> int:
+    """Add new commits to test repository for sync testing.
+    
+    Creates simple file modifications and commits them to demonstrate
+    the sync functionality detecting new commits.
+    
+    Args:
+        count: Number of commits to add (default: 1)
+    
+    Returns:
+        Number of commits successfully added
+    """
+    import tempfile
+    import subprocess
+    from datetime import datetime
+    
+    fixture = get_fixture()
+    repo = fixture.client.get_repo(TEST_REPO_FULL)
+    
+    added = 0
+    for i in range(count):
+        try:
+            # Create a simple test file with timestamp
+            timestamp = datetime.now().isoformat()
+            filename = f"test_sync_{timestamp.replace(':', '-')}.txt"
+            content = f"Test commit {i+1} added at {timestamp}\n"
+            
+            # Create file in repo
+            repo.create_file(
+                path=filename,
+                message=f"test: add sync demo commit {i+1}",
+                content=content,
+                branch=repo.default_branch
+            )
+            added += 1
+            logger.info(f"Added commit {i+1}/{count}: {filename}")
+        except Exception as e:
+            logger.warning(f"Failed to add commit {i+1}: {e}")
+            break
+    
+    return added
