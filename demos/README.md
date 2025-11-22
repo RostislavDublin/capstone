@@ -7,97 +7,117 @@
 Эта папка содержит скрипты для **ручной проверки и демонстрации**, которые:
 - Показывают работу системы в действии
 - Полезны для отладки и разработки
-- Используют реальные API (Gemini, GitHub)
+- Используют реальные API (Gemini, GitHub, Vertex AI)
 - **НЕ являются автоматическими тестами** (для этого есть `tests/`)
 
-## Доступные демо
+## 🟢 Рабочие демо
 
-### `demo_analyzer.py`
-**Демонстрация Analyzer Agent с реальным PR diff**
+### 1. `demo_quality_guardian_agent.py` ⭐ **ГЛАВНЫЙ**
+**ADK Multi-Agent Implementation - Production-Ready Architecture**
 
-Показывает как агент анализирует изменения кода:
-1. Создает merged state (base repo + PR diff)
-2. Запускает security scanner (bandit)
-3. Анализирует complexity (radon)
-4. Генерирует AI рекомендации через Gemini 2.0
+Демонстрирует полную работу Quality Guardian Agent с использованием Google ADK:
+- Natural language commands → ADK Agent → Tool execution
+- RAG Corpus integration (Vertex AI) для persistent storage
+- Bootstrap → Sync → Query workflow
+- GitHub API integration (real repository commits)
 
 **Запуск:**
 ```bash
 cd /Users/Rostislav_Dublin/src/drs/ai/capstone
-python demos/demo_analyzer.py
+python demos/demo_quality_guardian_agent.py 1
 ```
 
+**Режимы:**
+- Mode 1: Интерактивное меню (все 4 теста подряд)
+- Mode 2: Bootstrap only (analyze N commits)
+- Mode 3: Sync only (check for new commits)
+- Mode 4: Query only (ask questions about audits)
+
 **Требования:**
-- Google AI Studio API key в `.env` или переменной окружения
-- Test fixture репозиторий: `tests/fixtures/test-app/`
+- GitHub token: `GITHUB_TOKEN` в `.env.dev`
+- Google Cloud project: `GOOGLE_CLOUD_PROJECT`
+- Test repository: `RostislavDublin/capstone-test-fixture`
 
 **Пример вывода:**
 ```
-Initializing Analyzer Agent...
-Step 1: Parsing git diff...
-Step 2: Creating merged repository (base + PR)...
-   Merged state created at: /tmp/pr_review_xyz/repo
-Step 3: Running security analysis...
-   app/database.py: 3 issues (H:3 M:0 L:0)
-Step 4: Analyzing code complexity...
-Step 5: Generating AI recommendations...
+✅ Loaded environment from .env.dev
+
+╔════════════════════════════════════════════════════════════════════╗
+║  Quality Guardian Agent Demo - ADK Implementation (Google Agent)   ║
+╚════════════════════════════════════════════════════════════════════╝
+
+TEST 1: Bootstrap with 5 commits
+✓ Bootstrap agent completed analysis of 5 commits
+
+TEST 2: Sync (check for new commits)
+✓ Found 2 new commits, analysis complete
+
+TEST 3: Query RAG
+Question: What security issues were found?
+✓ Query results: Found 3 SQL injection patterns...
+
+TEST 4: Agent Capabilities
+✓ Agent can handle: bootstrap, sync, query operations
 ```
 
 ---
 
-### `demo_backend_integration.py`
-**Backend Integration Test - GitHubConnector + AuditEngine**
+### 2. `demo_memory.py`
+**Memory Bank - Pattern Learning and Recognition**
 
-**⚠️ Scope: Backend tools integration test only**
-- Tests GitHubConnector API integration
-- Tests AuditEngine (security + complexity analysis)
-- Tests FileAudit models (per-file tracking)
-- **NOT TESTED:** ADK Agent, RAG Corpus, orchestration layer
+Демонстрирует как Memory Bank:
+- Хранит review patterns из code reviews
+- Отслеживает частоту и acceptance rate паттернов
+- Хранит team coding standards
+- Вспоминает похожие паттерны during reviews
+- Предоставляет статистику по выученным паттернам
 
 **Запуск:**
 ```bash
 cd /Users/Rostislav_Dublin/src/drs/ai/capstone
-python demos/demo_backend_integration.py
+python demos/demo_memory.py
 ```
 
 **Требования:**
-- GitHub token в `.env.dev`: `GITHUB_TOKEN`
-- Google Cloud credentials (for temp checkouts only, RAG not used yet)
+- Нет внешних зависимостей (использует in-memory storage)
 
 **Что демонстрируется:**
 ```
-╔══════════════════════════════════════════════════════════════════╗
-║         🔍 QUALITY GUARDIAN AGENT DEMONSTRATION 🔍               ║
-╚══════════════════════════════════════════════════════════════════╝
+================================================================================
+                     SCENARIO 1: Learning from Code Reviews                     
+================================================================================
 
-DEMO 1: Component Integration
-   ✓ GitHub Connector - connects to RostislavDublin/capstone
-   ✓ Bootstrap Handler - samples commits (recent/tags/date-range)
-   ✓ Audit Engine - analyzes code quality and security
-   ✓ RAG Storage Manager - stores audits in Vertex AI
+Review 1: Found SQL injection in PR #123
+   ✓ Pattern stored: f0e5584598cce1ac
+   ✓ Developer fixed the issue (accepted)
 
-DEMO 2: Bootstrap Workflow (Historical Scan)
-   Command: 'bootstrap RostislavDublin/capstone strategy=recent count=3'
-   ✅ Analyzed 3 commits
-   📊 Commit Details:
-      1. 880a499 - feat: Add Memory Bank implementation
-         Files: 5, Lines: +234/-12
-         File breakdown:
-           • src/memory/schema.py (+145/-0)
-           • tests/unit/test_memory_bank.py (+89/-0)
+Review 2: Found similar SQL injection in PR #156
+   ✓ Same pattern detected: True
+   ✓ Frequency increased to 2
 
-DEMO 3: Sync Workflow (Incremental Updates)
-   Command: 'sync RostislavDublin/capstone'
-   ✅ Repository is up to date!
-   Last audited commit: 880a499
+SCENARIO 2: Team Standards
+   ✓ Stored: Always use type hints in function signatures
+   ✓ Stored: Max line length is 88 characters (Black)
+
+SCENARIO 3: Pattern Statistics
+   Most common patterns:
+   1. SQL injection: 3 occurrences (100% accepted)
+   2. Missing error handling: 2 occurrences (50% accepted)
 ```
 
-**Архитектура:**
-```
-QualityGuardianAgent (orchestrator)
-├── RepositoryConnector → GitHub API
-├── BootstrapHandler → Sampling strategies
-├── AuditEngine → Security + Quality analysis
+---
+
+## 🔴 Устаревшие/сломанные демо
+
+### `demo_context_caching.py`
+**Статус:** ❌ Не работает (синтаксическая ошибка + устаревший API)
+
+**Проблемы:**
+- Написан для старого API (не Vertex AI)
+- Использует несуществующий `client.caches.create()`
+- Proof-of-concept, не интегрирован с текущей архитектурой
+
+**Рекомендация:** Удалить или переписать для Vertex AI Context Caching API
 └── RAGCorpusManager → Vertex AI RAG storage
 ```
 

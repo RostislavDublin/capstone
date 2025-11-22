@@ -1,4 +1,3 @@
-"""
 """Proof-of-concept: Context Caching with Vertex AI
 
 Tests basic cache operations to understand the API before integration.

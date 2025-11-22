@@ -461,8 +461,15 @@ def test_get_latest_audit_found(
     rag_manager._corpus = mock_rag_corpus
     rag_manager._corpus_resource_name = mock_rag_corpus.name
 
+    # Mock text must contain commit_sha and date in parseable format
     mock_context = Mock()
-    mock_context.text = "Latest audit"
+    mock_context.text = '''
+    {
+        "commit_sha": "abc1234567890def",
+        "date": "2024-01-15T10:30:00Z",
+        "message": "Test commit"
+    }
+    '''
     mock_context.distance = 0.95
 
     mock_contexts = Mock()
@@ -475,7 +482,8 @@ def test_get_latest_audit_found(
     result = rag_manager.get_latest_audit("acme/web-app", audit_type="commit")
 
     assert result is not None
-    assert result["text"] == "Latest audit"
+    assert result["commit_sha"] == "abc1234567890def"
+    assert "2024-01-15" in result["date"]
 
 
 @patch("src.storage.rag_corpus.rag.retrieval_query")

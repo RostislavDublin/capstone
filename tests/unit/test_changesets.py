@@ -13,7 +13,7 @@ from tests.fixtures.changesets import (
     CHANGESET_04_CLEAN_CODE,
     get_changeset
 )
-from tools.diff_generator import generate_diff_from_changeset, generate_all_diffs
+from lib.diff_generator import generate_diff_from_changeset, generate_all_diffs
 from tests.fixtures.mock_pr import (
     create_mock_pr_from_changeset,
     create_all_mock_prs,

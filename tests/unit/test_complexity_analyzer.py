@@ -1,7 +1,7 @@
-"""Unit tests for complexity_analyzer.py"""
+"""Unit tests for complexity analyzer tool."""
 
 import pytest
-from tools.complexity_analyzer import (
+from lib.complexity_analyzer import (
     calculate_complexity,
     format_complexity_report,
     FunctionComplexity,

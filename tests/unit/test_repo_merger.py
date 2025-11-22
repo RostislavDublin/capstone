@@ -3,7 +3,7 @@
 import pytest
 import tempfile
 from pathlib import Path
-from tools.repo_merger import (
+from lib.repo_merger import (
     create_merged_repository,
     cleanup_merged_repository,
     get_changed_files_from_diff

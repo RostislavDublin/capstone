@@ -203,7 +203,7 @@ def test_calculate_quality_score_mixed(audit_engine):
 
 def test_create_complexity_issue(audit_engine, tmp_path):
     """Test complexity issue creation."""
-    from src.tools.complexity_analyzer import FunctionComplexity
+    from src.lib.complexity_analyzer import FunctionComplexity
 
     func_data = FunctionComplexity(
         name="test_func",
@@ -225,7 +225,7 @@ def test_create_complexity_issue(audit_engine, tmp_path):
 
 def test_create_complexity_issue_severities(audit_engine, tmp_path):
     """Test complexity severity levels."""
-    from src.tools.complexity_analyzer import FunctionComplexity
+    from src.lib.complexity_analyzer import FunctionComplexity
 
     file_path = tmp_path / "test.py"
 

@@ -13,6 +13,8 @@ Usage:
 
 import logging
 import os
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -296,3 +298,237 @@ def add_test_commits(count: int = 1) -> int:
             break
     
     return added
+
+
+def reset_to_fixture_state(initial_commits: int = 3) -> str:
+    """Reset repository to clean test-app state and apply fixture commits.
+    
+    This is the MAIN function for demos and tests - provides deterministic state:
+    1. Deletes all existing commits
+    2. Restores clean test-app template
+    3. Applies initial fixture commits (default: 3 for bootstrap)
+    
+    Args:
+        initial_commits: Number of commits to apply initially (1-5)
+                        Default 3 leaves 2 commits for sync testing
+    
+    Returns:
+        Repository full name
+    """
+    import shutil
+    import subprocess
+    from datetime import datetime, timedelta
+    
+    logger.info("\n" + "="*80)
+    logger.info("  🔄 RESETTING TO FIXTURE STATE")
+    logger.info("="*80 + "\n")
+    
+    # Clone repository
+    token = os.getenv("GITHUB_TOKEN")
+    temp_dir = Path("/tmp/quality-guardian-fixture-reset")
+    
+    if temp_dir.exists():
+        shutil.rmtree(temp_dir)
+    
+    repo_url = f"https://{token}@github.com/{TEST_REPO_FULL}.git"
+    
+    logger.info(f"📥 Cloning {TEST_REPO_FULL}...")
+    subprocess.run(
+        ["git", "clone", repo_url, str(temp_dir)],
+        check=True,
+        capture_output=True
+    )
+    
+    # Remove all files except .git
+    logger.info("🗑️  Removing existing files...")
+    for item in temp_dir.iterdir():
+        if item.name == ".git":
+            continue
+        if item.is_dir():
+            shutil.rmtree(item)
+        else:
+            item.unlink()
+    
+    # Copy test-app template
+    logger.info(f"📋 Copying test-app template...")
+    for item in FIXTURE_PATH.iterdir():
+        if item.name == ".git":
+            continue
+        
+        dest = temp_dir / item.name
+        if item.is_dir():
+            shutil.copytree(item, dest)
+        else:
+            shutil.copy2(item, dest)
+    
+    # Commit clean state
+    logger.info("💾 Committing clean state...")
+    subprocess.run(["git", "add", "-A"], cwd=temp_dir, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "chore: Reset to test-app template"],
+        cwd=temp_dir,
+        check=True,
+        capture_output=True
+    )
+    
+    # Apply initial fixture commits (leaving some for sync)
+    logger.info(f"📦 Applying {initial_commits} fixture commits...")
+    _apply_fixture_commits(temp_dir, start=0, count=initial_commits)
+    
+    # Force push
+    logger.info("🚀 Force pushing to origin...")
+    subprocess.run(
+        ["git", "push", "--force", "origin", "main"],
+        cwd=temp_dir,
+        check=True,
+        capture_output=True
+    )
+    
+    # Cleanup
+    shutil.rmtree(temp_dir)
+    
+    logger.info("\n✅ Repository reset complete!\n")
+    return TEST_REPO_FULL
+
+
+def apply_remaining_fixture_commits(start_from: int = 4) -> int:
+    """Apply remaining fixture commits for sync testing.
+    
+    Use this after reset_to_fixture_state() to add more commits
+    that sync agent can detect.
+    
+    Args:
+        start_from: Which commit to start from (1-5)
+        
+    Returns:
+        Number of commits applied
+    """
+    import shutil
+    import subprocess
+    
+    logger.info(f"\n📦 Adding remaining fixture commits (from #{start_from})...")
+    
+    token = os.getenv("GITHUB_TOKEN")
+    temp_dir = Path("/tmp/quality-guardian-add-commits")
+    
+    if temp_dir.exists():
+        shutil.rmtree(temp_dir)
+    
+    # Clone
+    repo_url = f"https://{token}@github.com/{TEST_REPO_FULL}.git"
+    subprocess.run(
+        ["git", "clone", repo_url, str(temp_dir)],
+        check=True,
+        capture_output=True
+    )
+    
+    # Apply remaining commits
+    remaining = 5 - start_from + 1  # e.g., start_from=4 → commits 4,5 → 2 commits
+    _apply_fixture_commits(temp_dir, start=start_from - 1, count=remaining)
+    
+    # Push
+    logger.info("🚀 Pushing new commits...")
+    subprocess.run(
+        ["git", "push", "origin", "main"],
+        cwd=temp_dir,
+        check=True,
+        capture_output=True
+    )
+    
+    # Cleanup
+    shutil.rmtree(temp_dir)
+    
+    logger.info(f"✅ Added {remaining} commits!\n")
+    return remaining
+
+
+def _apply_fixture_commits(repo_path: Path, start: int = 0, count: int = 5):
+    """Apply fixture commits from fixtures/commits/ directory.
+    
+    Args:
+        repo_path: Path to git repository
+        start: Starting index (0-4)
+        count: Number of commits to apply
+    """
+    from datetime import datetime, timedelta
+    import importlib.util
+    
+    commits_dir = Path(__file__).parent / "commits"
+    
+    all_commits = [
+        "commit_01_add_logging",
+        "commit_02_fix_sql_injection",
+        "commit_03_add_password_validation",
+        "commit_04_refactor_config",
+        "commit_05_add_validation",
+    ]
+    
+    # Select commits to apply
+    commit_files = all_commits[start:start + count]
+    
+    base_date = datetime.now()
+    
+    for i, commit_name in enumerate(commit_files):
+        commit_file = commits_dir / f"{commit_name}.py"
+        
+        if not commit_file.exists():
+            logger.warning(f"Commit fixture not found: {commit_file}")
+            continue
+        
+        # Import commit module
+        spec = importlib.util.spec_from_file_location(commit_name, commit_file)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        
+        logger.info(f"  {i+1}/{count}: {module.COMMIT_MESSAGE}")
+        
+        # Apply changes by writing files directly
+        if hasattr(module, 'FILES'):
+            # New format: FILES dict with full file contents
+            for file_path, content in module.FILES.items():
+                full_path = repo_path / file_path
+                full_path.parent.mkdir(parents=True, exist_ok=True)
+                full_path.write_text(content, encoding='utf-8')
+        elif hasattr(module, 'DIFF'):
+            # Legacy format: git diff (try to apply)
+            diff_file = repo_path / ".temp.patch"
+            diff_file.write_text(module.DIFF, encoding='utf-8')
+            
+            try:
+                subprocess.run(
+                    ["patch", "-p1", "-i", str(diff_file)],
+                    cwd=repo_path,
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Failed to apply patch: {e.stderr}")
+                raise
+            finally:
+                if diff_file.exists():
+                    diff_file.unlink()
+        else:
+            logger.error(f"Commit module {commit_name} has neither FILES nor DIFF")
+            raise ValueError("Invalid commit fixture format")
+        
+        # Stage and commit
+        subprocess.run(["git", "add", "-A"], cwd=repo_path, check=True)
+        
+        # Commit with proper date (1 hour apart)
+        commit_date = base_date - timedelta(hours=count - i - 1)
+        env = os.environ.copy()
+        env["GIT_AUTHOR_NAME"] = module.AUTHOR
+        env["GIT_AUTHOR_EMAIL"] = module.AUTHOR_EMAIL
+        env["GIT_COMMITTER_NAME"] = module.AUTHOR
+        env["GIT_COMMITTER_EMAIL"] = module.AUTHOR_EMAIL
+        env["GIT_AUTHOR_DATE"] = commit_date.isoformat()
+        env["GIT_COMMITTER_DATE"] = commit_date.isoformat()
+        
+        subprocess.run(
+            ["git", "commit", "-m", module.COMMIT_MESSAGE],
+            cwd=repo_path,
+            env=env,
+            check=True,
+            capture_output=True
+        )

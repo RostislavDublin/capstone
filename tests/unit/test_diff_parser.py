@@ -1,7 +1,7 @@
-"""Unit tests for git diff parser tool."""
+"""Unit tests for diff parser tool."""
 
 import pytest
-from tools.diff_parser import (
+from lib.diff_parser import (
     parse_git_diff,
     get_added_code_blocks,
     DiffAnalysis,

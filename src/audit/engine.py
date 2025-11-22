@@ -7,8 +7,8 @@ from typing import List, Optional
 
 from audit_models import CommitAudit, FileAudit, RepositoryAudit
 from connectors.base import CommitInfo, RepositoryConnector
-from tools.complexity_analyzer import calculate_complexity
-from tools.security_scanner import detect_security_issues
+from lib.complexity_analyzer import calculate_complexity
+from lib.security_scanner import detect_security_issues
 
 
 class AuditEngine:

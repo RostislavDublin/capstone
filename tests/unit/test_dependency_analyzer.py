@@ -1,7 +1,7 @@
-"""Tests for dependency analyzer."""
+"""Unit tests for dependency analyzer."""
 
 import pytest
-from tools.dependency_analyzer import (
+from lib.dependency_analyzer import (
     analyze_dependencies,
     detect_breaking_changes,
     analyze_impact,
@@ -149,7 +149,7 @@ def new_api(arg1):
 
 def test_format_impact_report():
     """Test impact report formatting."""
-    from tools.dependency_analyzer import ImpactAnalysis
+    from lib.dependency_analyzer import ImpactAnalysis
     
     impact = ImpactAnalysis(
         changed_modules=["app/module1.py", "app/module2.py"],

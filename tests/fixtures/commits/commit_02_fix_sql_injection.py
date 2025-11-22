@@ -1,9 +1,16 @@
-"""Database operations module."""
+"""Fixture Commit 02: Fix SQL injection in database.py"""
+
+COMMIT_MESSAGE = "fix: Prevent SQL injection in user queries"
+AUTHOR = "Security Team"
+AUTHOR_EMAIL = "security@example.com"
+
+FILES = {
+    "app/database.py": '''"""Database operations with SQL injection vulnerabilities."""
 
 import sqlite3
 from typing import Optional, Dict, Any
 
-# Global database connection
+# Global mutable state
 _connection: Optional[sqlite3.Connection] = None
 
 
@@ -16,20 +23,27 @@ def get_connection():
 
 
 def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
-    """Get user by ID from database."""
+    """Get user by ID.
+    
+    SQL injection vulnerability - user input directly interpolated into query.
+    """
     conn = get_connection()
+    # SQL INJECTION HERE - no parameterization
     query = f"SELECT * FROM users WHERE id = {user_id}"
     cursor = conn.cursor()
     result = cursor.fetchone()
+    # Cursor never closed
     return result
 
 
 def search_users(username: str) -> list:
-    """Search users by username."""
+    """Search users by username - FIXED."""
     conn = get_connection()
-    query = "SELECT * FROM users WHERE username LIKE '%" + username + "%'"
+    # Fixed: Use parameterized query
+    query = "SELECT * FROM users WHERE username LIKE ?"
     cursor = conn.cursor()
-    results = cursor.fetchall()
+    results = cursor.execute(query, (f"%{username}%",)).fetchall()
+    cursor.close()
     return results
 
 
@@ -40,17 +54,9 @@ def delete_user(user_id):
     cursor = conn.cursor()
     cursor.execute(query)
     conn.commit()
+'''
+}
 
-
-def init_db():
-    """Initialize database schema."""
-    conn = get_connection()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY,
-            username TEXT NOT NULL,
-            password TEXT NOT NULL,
-            email TEXT
-        )
-    """)
-    conn.commit()
+FILES_CHANGED = ["app/database.py"]
+ADDITIONS = 3
+DELETIONS = 2

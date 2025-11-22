@@ -15,7 +15,7 @@ from models import (
     PRDiff
 )
 from tests.fixtures.changesets import Changeset
-from tools.diff_generator import generate_diff_from_changeset
+from lib.diff_generator import generate_diff_from_changeset
 
 
 def create_mock_pr_author(

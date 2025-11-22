@@ -42,7 +42,7 @@ class TestFixtureConfig(BaseModel):
     remote_repo: str = Field(
         default_factory=lambda: os.getenv(
             "TEST_FIXTURE_REPO", 
-            "RostislavDublin/code-review-test-fixture"
+            "RostislavDublin/quality-guardian-test-fixture"
         ),
         description="Remote GitHub repository for test fixture"
     )

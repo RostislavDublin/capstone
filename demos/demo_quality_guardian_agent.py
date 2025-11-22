@@ -70,20 +70,8 @@ def print_section(title: str):
     print("=" * 80 + "\n")
 
 
-def setup_test_environment():
-    """Setup test repository and clean corpus."""
-    print_section("🛠️  SETUP - Test Environment")
-    
-    print("Step 1: Ensuring test repository exists and is valid...")
-    try:
-        test_repo = ensure_test_repo()
-        print(f"✅ Test repository ready: {test_repo}")
-    except Exception as e:
-        print(f"❌ Failed to setup test repo: {e}")
-        logger.error("Test repo setup failed", exc_info=True)
-        sys.exit(1)
-    
-    print("\nStep 2: Cleaning old RAG corpus for clean demo...")
+def clean_rag_corpus():
+    """Clean RAG corpus before demo."""
     try:
         import vertexai
         from storage.rag_corpus import RAGCorpusManager
@@ -92,23 +80,17 @@ def setup_test_environment():
         location = os.getenv("VERTEX_LOCATION", "us-west1")
         vertexai.init(project=project, location=location)
         
-        # Clear files from existing corpus (faster than delete + recreate)
-        try:
-            rag_manager = RAGCorpusManager(corpus_name="quality-guardian-audits")
-            rag_manager.initialize_corpus()
-            
-            files_deleted = rag_manager.clear_all_files()
-            if files_deleted > 0:
-                print(f"✅ Cleared {files_deleted} file(s) from corpus")
-            else:
-                print("ℹ️  Corpus is empty (clean slate)")
-        except Exception as e:
-            print(f"⚠️  Could not clear corpus: {e}")
-            logger.warning(f"Corpus cleanup failed: {e}")
+        rag_manager = RAGCorpusManager(corpus_name="quality-guardian-audits")
+        rag_manager.initialize_corpus()
+        
+        files_deleted = rag_manager.clear_all_files()
+        if files_deleted > 0:
+            print(f"✅ Cleared {files_deleted} file(s) from RAG corpus")
+        else:
+            print("ℹ️  RAG corpus is empty (clean slate)")
     except Exception as e:
-        print(f"⚠️  Could not initialize Vertex AI: {e}")
-    
-    print("\n✅ Test environment ready!\n")
+        print(f"⚠️  Could not clear corpus: {e}")
+        logger.warning(f"Corpus cleanup failed: {e}")
 
 
 async def demo_natural_language_commands():
@@ -128,33 +110,35 @@ async def demo_natural_language_commands():
     runner = InMemoryRunner(agent=root_agent)
     print("✅ Agent runner ready (ADK)\n")
     
-    # Test 1: Bootstrap with natural language
+    # SETUP 1: Reset to 3 fixture commits for bootstrap
+    print_section("📝 SETUP 1: Prepare Repository for Bootstrap")
+    print("Resetting to 3 fixture commits (4 total with initial)...\n")
+    
+    from fixtures.fast_reset_api import reset_to_fixture_state_api
+    reset_to_fixture_state_api(initial_commits=3)
+    print(f"✅ Repository ready: {test_repo} with 3 commits\n")
+    
+    print("Cleaning RAG corpus...")
+    clean_rag_corpus()
+    print()
+    
+    # Test 1: Bootstrap with 3 commits
     print_section("TEST 1: Bootstrap Command (Natural Language)")
     
-    command1 = f"Bootstrap {test_repo} with 5 commits"
+    command1 = f"Bootstrap {test_repo} with 3 commits"
     print(f"🗣️  User: '{command1}'\n")
     
     response1 = await runner.run_debug(command1)
+    print()  # Extra newline for spacing
     
-    # Extract clean text response
-    if isinstance(response1, list) and response1:
-        last_event = response1[-1]
-        if hasattr(last_event, 'content') and last_event.content.parts:
-            text = last_event.content.parts[0].text if hasattr(last_event.content.parts[0], 'text') else str(response1)
-            print(f"🤖 Agent: {text}\n")
+    # SETUP 2: Add 2 more commits on top (now 6 total)
+    print_section("📝 SETUP 2: Add New Commits for Sync Test")
+    print("Adding 2 more fixture commits on top (6 total)...")
+    print("(Simulates real-world: new code pushed after bootstrap)\n")
     
-    # Intermediate step: Add new commits to repository for sync demo
-    print_section("📝 SETUP - Adding New Commits")
-    print("Creating 2 new commits in test repository...")
-    print("(This simulates real-world scenario where new code is pushed)\n")
-    
-    try:
-        from fixtures.test_repo_fixture import add_test_commits
-        added = add_test_commits(count=2)
-        print(f"✅ Added {added} new commit(s) to {test_repo}\n")
-    except Exception as e:
-        print(f"⚠️  Could not add commits (repository may be read-only): {e}\n")
-        print("Continuing with sync test anyway...\n")
+    from fixtures import apply_remaining_fixture_commits
+    added = apply_remaining_fixture_commits(start_from=4)
+    print(f"✅ Added {added} new commits to {test_repo} (now 6 total)\n")
     
     # Test 2: Sync command
     print_section("TEST 2: Sync Command (Check for New Commits)")
@@ -163,13 +147,7 @@ async def demo_natural_language_commands():
     print(f"🗣️  User: '{command2}'\n")
     
     response2 = await runner.run_debug(command2)
-    
-    # Extract clean text response
-    if isinstance(response2, list) and response2:
-        last_event = response2[-1]
-        if hasattr(last_event, 'content') and last_event.content.parts:
-            text = last_event.content.parts[0].text if hasattr(last_event.content.parts[0], 'text') else str(response2)
-            print(f"🤖 Agent: {text}\n")
+    print()
     
     # Test 3: Query trends
     print_section("TEST 3: Query Command (Quality Trends)")
@@ -178,13 +156,7 @@ async def demo_natural_language_commands():
     print(f"🗣️  User: '{command3}'\n")
     
     response3 = await runner.run_debug(command3)
-    
-    # Extract clean text response
-    if isinstance(response3, list) and response3:
-        last_event = response3[-1]
-        if hasattr(last_event, 'content') and last_event.content.parts:
-            text = last_event.content.parts[0].text if hasattr(last_event.content.parts[0], 'text') else str(response3)
-            print(f"🤖 Agent: {text}\n")
+    print()
     
     # Test 4: Natural Question
     print_section("TEST 4: Natural Question (Agent's Capabilities)")
@@ -193,13 +165,7 @@ async def demo_natural_language_commands():
     print(f"🗣️  User: '{command4}'\n")
     
     response4 = await runner.run_debug(command4)
-    
-    # Extract clean text response
-    if isinstance(response4, list) and response4:
-        last_event = response4[-1]
-        if hasattr(last_event, 'content') and last_event.content.parts:
-            text = last_event.content.parts[0].text if hasattr(last_event.content.parts[0], 'text') else str(response4)
-            print(f"🤖 Agent: {text}\n")
+    print()
 
 
 def demo_agent_composition():
@@ -265,9 +231,6 @@ def main():
     print("║" + "  Proper ADK pattern with deployment-ready architecture".center(78) + "║")
     print("║" + " " * 78 + "║")
     print("▕" + "=" * 78 + "▗")
-    
-    # Setup test environment first
-    setup_test_environment()
     
     # Check for command line argument
     if len(sys.argv) > 1:

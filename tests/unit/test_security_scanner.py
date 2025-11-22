@@ -1,7 +1,7 @@
-"""Unit tests for security_scanner.py"""
+"""Unit tests for security scanner tool."""
 
 import pytest
-from tools.security_scanner import (
+from lib.security_scanner import (
     detect_security_issues,
     format_security_report,
     SecurityIssue,
