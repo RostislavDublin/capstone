@@ -453,29 +453,31 @@ def test_query_audits_failure(
 # ============================================================================
 
 
-@patch("src.storage.rag_corpus.rag.retrieval_query")
-def test_get_latest_audit_found(
-    mock_retrieval_query, mock_vertexai, rag_manager, mock_rag_corpus
-):
+def test_get_latest_audit_found(mock_vertexai, rag_manager, mock_rag_corpus):
     """Test get_latest_audit returns latest audit."""
     rag_manager._corpus = mock_rag_corpus
     rag_manager._corpus_resource_name = mock_rag_corpus.name
 
-    mock_context = Mock()
-    mock_context.text = "Latest audit"
-    mock_context.distance = 0.95
+    # Mock query_audits to return commit data with SHA and date
+    mock_audit_text = '''
+    {
+        "commit_sha": "abc123def456",
+        "date": "2024-11-20T10:30:00Z",
+        "repository": "acme/web-app",
+        "author": "test@example.com"
+    }
+    '''
+    
+    with patch.object(rag_manager, 'query_audits') as mock_query:
+        mock_query.return_value = [
+            {"text": mock_audit_text, "distance": 0.95}
+        ]
+        
+        result = rag_manager.get_latest_audit("acme/web-app", audit_type="commit")
 
-    mock_contexts = Mock()
-    mock_contexts.contexts = [mock_context]
-
-    mock_response = Mock()
-    mock_response.contexts = mock_contexts
-    mock_retrieval_query.return_value = mock_response
-
-    result = rag_manager.get_latest_audit("acme/web-app", audit_type="commit")
-
-    assert result is not None
-    assert result["text"] == "Latest audit"
+        assert result is not None
+        assert result["commit_sha"] == "abc123def456"
+        assert "2024-11-20" in result["date"]
 
 
 @patch("src.storage.rag_corpus.rag.retrieval_query")
