@@ -186,17 +186,24 @@ def check_new_commits(repo: str) -> dict:
 
 def query_trends(repo: str, question: str) -> dict:
     """
-    Query quality trends using Gemini with RAG grounding.
+    Query quality trends using Gemini with RAG grounding (ADK Memory pattern).
     
-    Uses Vertex AI RAG to retrieve relevant audit history,
-    then Gemini analyzes trends and provides insights.
+    CORRECT APPROACH (per ADK Memory docs):
+    - RAG provides semantic search over stored audit history
+    - Gemini analyzes trends using RAG-grounded context
+    - No manual JSON parsing - let RAG + Gemini do the work
+    
+    This pattern mirrors ADK's Memory system:
+    - Store: commit audits saved to RAG corpus
+    - Retrieve: semantic search finds relevant audits  
+    - Analyze: Gemini extracts insights with RAG grounding
     
     Args:
         repo: Repository identifier
-        question: Question about quality trends
+        question: Question about quality trends (natural language)
     
     Returns:
-        AI-generated analysis based on audit history
+        AI-generated analysis with corpus stats
     """
     try:
         from storage.rag_corpus import RAGCorpusManager
@@ -212,19 +219,141 @@ def query_trends(repo: str, question: str) -> dict:
         rag_mgr = RAGCorpusManager(corpus_name="quality-guardian-audits")
         rag_mgr.initialize_corpus()
         
-        # Build prompt for Gemini
-        prompt = f"""Analyze code quality trends for {repo}.
-
-Question: {question}
-
-Based on commit audit data from RAG corpus, provide:
-1. Trend direction (improving/stable/degrading)
-2. Number of commits analyzed
-3. Key findings
-
-Be specific with numbers. Keep response concise (2-3 sentences)."""
+        # Get basic corpus stats
+        stats = rag_mgr.get_corpus_stats()
         
-        # Create RAG retrieval tool
+        if stats.get("commit_files", 0) == 0:
+            return {
+                "status": "no_data",
+                "message": f"No audit data found for {repo}. Run bootstrap or sync first.",
+                "corpus_stats": stats
+            }
+        
+        logger.info(f"Querying trends for {repo}: {stats['commit_files']} commits in corpus")
+        
+        # Build comprehensive prompt with data extraction instructions
+        prompt = f"""You are analyzing code quality trends for repository: {repo}
+
+CORPUS INFORMATION:
+- Total commit audits stored: {stats['commit_files']}
+- Repository: {repo}
+
+USER QUESTION: {question}
+
+STEP-BY-STEP ANALYSIS ALGORITHM:
+
+STEP 1: DATA EXTRACTION
+From the RAG corpus commit audit data, extract for EACH commit:
+- commit_sha (string)
+- date (ISO format timestamp)
+- quality_score (0-100 float)
+- total_issues (integer)
+- critical_issues (integer)
+- security_issues (list/count)
+- complexity_issues (list/count)
+- author (string)
+- files (list of changed files with their issues)
+
+STEP 2: TEMPORAL ORDERING
+Sort commits by date (newest first). Identify:
+- Recent commits: last 3-5 commits
+- Historical commits: older commits for comparison
+
+STEP 3: TREND CALCULATION
+Calculate trend direction using this algorithm:
+```
+recent_avg_quality = average(quality_score of last 3-5 commits)
+historical_avg_quality = average(quality_score of all older commits)
+trend_delta = recent_avg_quality - historical_avg_quality
+
+if trend_delta > 5: trend = "IMPROVING"
+elif trend_delta < -5: trend = "DEGRADING"
+else: trend = "STABLE"
+```
+
+STEP 4: PATTERN DETECTION
+Analyze the extracted data to find:
+- Most frequent security issue types (e.g., "SQL injection", "hardcoded password")
+- Most frequent complexity issues (high complexity functions)
+- Files that appear in multiple commits with issues (hotspots)
+- Authors with highest/lowest average quality scores
+
+STEP 5: ACTIONABLE INSIGHTS
+Based on patterns, recommend:
+- Which critical issues to fix first (cite specific commits/files)
+- Which files need refactoring (most problematic)
+- What coding practices to improve
+
+===== MANDATORY OUTPUT FORMAT (FOLLOW EXACTLY) =====
+
+YOU MUST START WITH THIS SECTION - NO EXCEPTIONS:
+
+**📊 DATA SAMPLE (PROOF OF GROUNDING)**
+
+Extract commit data from RAG corpus and list here. Example format:
+
+```
+Recent Commits (last 3, newest first):
+1. SHA: b751439 | Date: 2024-11-22T15:30 | Quality: 89.5/100 | Issues: 3 | Author: John Doe
+2. SHA: a7454cf | Date: 2024-11-22T14:20 | Quality: 87.3/100 | Issues: 5 | Author: Jane Smith  
+3. SHA: 8439d23 | Date: 2024-11-22T13:10 | Quality: 86.1/100 | Issues: 4 | Author: John Doe
+
+Historical Commits (older, for baseline):
+1. SHA: 65cdf3b | Date: 2024-11-21T10:00 | Quality: 92.0/100 | Issues: 2 | Author: Jane Smith
+2. SHA: 20c7b25 | Date: 2024-11-20T09:00 | Quality: 88.5/100 | Issues: 3 | Author: Bob Wilson
+```
+
+⚠️ CRITICAL RULES:
+- Use ACTUAL commit SHAs from RAG (not invented examples)
+- Extract REAL dates, scores, issue counts from audit data
+- If RAG has fewer commits, list what's available
+- DO NOT proceed without this section
+
+---
+
+**📈 TREND ANALYSIS** (calculated from data above)
+
+Show your calculation explicitly:
+
+```
+Recent avg = (89.5 + 87.3 + 86.1) / 3 = 87.6
+Historical avg = (92.0 + 88.5) / 2 = 90.25
+Delta = 87.6 - 90.25 = -2.65
+
+Trend: DEGRADING (recent < historical)
+```
+
+Replace with your actual calculations from the commits you listed above.
+
+**Key Metrics**:
+- Commits analyzed: [number] (must match data sample above)
+- Current quality: [latest commit score from sample]
+- Critical issues: [count across all commits]
+- Security issues: [count]
+- Complexity issues: [count]
+
+**Issue Patterns** (with commit references):
+1. [Most common issue type]: [count] occurrences in commits: [SHA1, SHA2, ...]
+2. [Second most common]: [count] occurrences in commits: [SHA1, SHA2, ...]
+3. [Third most common]: [count] occurrences in commits: [SHA1, SHA2, ...]
+
+**Problematic Files** (with commit evidence):
+- [file path]: [issue count] in commits [SHA1, SHA2], quality: [score]
+- [file path]: [issue count] in commits [SHA1, SHA2], quality: [score]
+
+**Actionable Recommendations**:
+1. [Specific action with commit SHA/file/line reference from data above]
+2. [Specific action with commit SHA/file/line reference from data above]
+3. [Specific action with commit SHA/file/line reference from data above]
+
+CRITICAL REQUIREMENTS:
+1. You MUST list actual commit SHAs with their data (not placeholders)
+2. All numbers MUST be calculated from the commits you listed
+3. Show your calculation for trend (e.g., "(89.5 + 87.3 + 86.1) / 3 = 87.6")
+4. Every recommendation MUST cite a specific commit SHA from your data sample
+5. Do NOT invent data - extract it from RAG corpus only"""
+        
+        # Create RAG retrieval tool (semantic search)
         rag_tool = Tool.from_retrieval(
             retrieval=rag.Retrieval(
                 source=rag.VertexRagStore(
@@ -233,26 +362,31 @@ Be specific with numbers. Keep response concise (2-3 sentences)."""
                             rag_corpus=rag_mgr._corpus_resource_name,
                         )
                     ],
-                    similarity_top_k=10,
+                    similarity_top_k=20,  # Get more context for better analysis
                 ),
             )
         )
         
-        # Gemini with RAG grounding
+        # Gemini with RAG grounding (ADK Memory pattern)
         model = GenerativeModel(
             model_name="gemini-2.0-flash-001",
             tools=[rag_tool],
         )
         
+        # Generate response with RAG-grounded context
         response = model.generate_content(prompt)
-        analysis = response.text if hasattr(response, 'text') else str(response)
+        ai_analysis = response.text if hasattr(response, 'text') else str(response)
         
         return {
             "status": "success",
             "question": question,
-            "analysis": analysis
+            "repo": repo,
+            "commits_in_corpus": stats["commit_files"],
+            "analysis": ai_analysis,
+            "corpus_stats": stats,
+            "message": f"Analyzed {stats['commit_files']} commits from {repo}"
         }
         
     except Exception as e:
-        logger.error(f"Query failed: {e}")
-        return {"error": str(e)}
+        logger.error(f"Query failed: {e}", exc_info=True)
+        return {"error": str(e), "message": f"Analysis failed: {e}"}

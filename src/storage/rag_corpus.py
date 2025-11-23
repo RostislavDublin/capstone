@@ -481,3 +481,35 @@ class RAGCorpusManager:
                     logger.debug(f"Cleaned up temp file: {temp_file}")
                 except Exception as e:
                     logger.warning(f"Failed to delete temp file {temp_file}: {e}")
+
+    def get_corpus_stats(self) -> Dict:
+        """Get basic statistics about stored audits.
+        
+        CORRECT APPROACH per ADK Memory pattern:
+        - RAG is for semantic search, NOT structured data extraction
+        - Use RAG + Gemini for AI-powered insights
+        - For stats: count files, check corpus metadata
+        
+        Returns:
+            Dict with basic stats: file_count, corpus_name
+        """
+        if self._corpus_resource_name is None:
+            raise RuntimeError("Corpus not initialized. Call initialize_corpus() first.")
+        
+        try:
+            # List files to get count
+            files = list(rag.list_files(corpus_name=self._corpus_resource_name))
+            commit_files = [f for f in files if f.display_name.startswith("commit_")]
+            
+            return {
+                "total_files": len(files),
+                "commit_files": len(commit_files),
+                "corpus_name": self.corpus_name,
+                "corpus_resource": self._corpus_resource_name,
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get stats: {e}")
+            return {}
+
+
