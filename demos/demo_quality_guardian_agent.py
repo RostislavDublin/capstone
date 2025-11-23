@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Demo: Quality Guardian Agent - ADK Implementation.
 
 This demo shows the proper ADK Agent pattern:
@@ -35,7 +34,7 @@ else:
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from agent import root_agent
+from agents.quality_guardian.agent import root_agent
 
 # Import ADK runner (proper pattern from reference notebooks)
 from google.adk.runners import InMemoryRunner
