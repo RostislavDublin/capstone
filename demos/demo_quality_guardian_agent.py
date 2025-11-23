@@ -263,16 +263,7 @@ def main():
         
         print("\n" + "=" * 80)
         print("  ✅ Demo Complete!")
-        print("=" * 80)
-        print("\nWhat we demonstrated:")
-        print("  ✓ Proper ADK Agent pattern (not class-based)")
-        print("  ✓ Standalone tool functions with docstrings")
-        print("  ✓ RAG grounding with Tool.from_retrieval()")
-        print("  ✓ Deployment-ready architecture")
-        print("\nNext steps:")
-        print("  - Add .agent_engine_config.json for deployment")
-        print("  - Deploy to Cloud Run via Agent Engine")
-        print("  - Add observability and evaluation\n")
+        print("=" * 80 + "\n")
         
     except KeyboardInterrupt:
         print("\n\n👋 Demo interrupted. Goodbye!")
