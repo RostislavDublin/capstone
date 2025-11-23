@@ -10,8 +10,6 @@ class ModelConfig(BaseModel):
     """Configuration for Gemini models."""
     
     analyzer_model: str = Field(default="gemini-2.5-flash")
-    context_model: str = Field(default="gemini-2.5-pro")
-    reporter_model: str = Field(default="gemini-2.5-flash")
     temperature: float = Field(default=0.7)
     max_tokens: int = Field(default=8192)
 
@@ -20,7 +18,6 @@ class GitHubConfig(BaseModel):
     """Configuration for GitHub integration."""
     
     token: str = Field(description="GitHub personal access token")
-    webhook_secret: Optional[str] = Field(default=None)
     test_repo: Optional[str] = Field(default=None)
 
 
@@ -88,7 +85,6 @@ def load_config(env_file: Optional[str] = None) -> AppConfig:
     
     github_config = GitHubConfig(
         token=os.getenv("GITHUB_TOKEN", ""),
-        webhook_secret=os.getenv("GITHUB_WEBHOOK_SECRET"),
         test_repo=os.getenv("GITHUB_TEST_REPO"),
     )
     
@@ -103,8 +99,6 @@ def load_config(env_file: Optional[str] = None) -> AppConfig:
     return AppConfig(
         models=ModelConfig(
             analyzer_model=os.getenv("ANALYZER_MODEL", "gemini-2.5-flash"),
-            context_model=os.getenv("CONTEXT_MODEL", "gemini-2.5-pro"),
-            reporter_model=os.getenv("REPORTER_MODEL", "gemini-2.5-flash"),
         ),
         github=github_config,
         memory=MemoryConfig(
