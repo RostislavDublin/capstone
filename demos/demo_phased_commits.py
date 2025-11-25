@@ -20,7 +20,7 @@ from github import Github
 import os
 from dotenv import load_dotenv
 
-load_dotenv(project_root / ".env.dev")
+load_dotenv(project_root / ".env")
 
 TEST_REPO_FULL = "RostislavDublin/quality-guardian-test-fixture"
 

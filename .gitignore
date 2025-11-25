@@ -1,5 +1,5 @@
 # Environment files with secrets
-.env.dev
+.env
 .env.deploy
 service-account-key.json
 

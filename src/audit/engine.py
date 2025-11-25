@@ -102,6 +102,7 @@ class AuditEngine:
             ) + sum(1 for issue in all_complexity_issues if issue["severity"] == "low")
 
             return CommitAudit(
+                repository=repo_identifier,
                 commit_sha=commit.sha,
                 commit_message=commit.message,
                 author=commit.author,

@@ -23,12 +23,12 @@ from dotenv import load_dotenv
 warnings.filterwarnings("ignore", message=".*Unclosed.*", category=ResourceWarning)
 
 # Load environment variables
-env_file = Path(__file__).parent.parent / ".env.dev"
+env_file = Path(__file__).parent.parent / ".env"
 if env_file.exists():
     load_dotenv(env_file)
     print(f"✅ Loaded environment from {env_file}")
 else:
-    print(f"⚠️  No .env.dev found at {env_file}")
+    print(f"⚠️  No .env found at {env_file}")
 
 # Add src to path
 src_path = Path(__file__).parent.parent / "src"
@@ -115,16 +115,16 @@ async def demo_natural_language_commands():
     
     from fixtures.fast_reset_api import reset_to_fixture_state_api
     reset_to_fixture_state_api(initial_commits=3)
-    print(f"✅ Repository ready: {test_repo} with 3 commits\n")
+    print(f"✅ Repository ready: {test_repo} with 4 commits (initial + 3 fixtures)\n")
     
     print("Cleaning RAG corpus...")
     clean_rag_corpus()
     print()
     
-    # Test 1: Bootstrap with 3 commits
+    # Test 1: Bootstrap with 4 commits (initial + 3 fixtures)
     print_section("TEST 1: Bootstrap Command (Natural Language)")
     
-    command1 = f"Bootstrap {test_repo} with 3 commits"
+    command1 = f"Bootstrap {test_repo} with 4 commits"
     print(f"🗣️  User: '{command1}'\n")
     
     response1 = await runner.run_debug(command1)

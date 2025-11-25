@@ -47,6 +47,7 @@ def mock_rag_file():
 def sample_commit_audit():
     """Sample CommitAudit for testing."""
     return CommitAudit(
+        repository="acme/web-app",
         commit_sha="abc1234567890",
         commit_message="Add user authentication",
         author="John Doe",

@@ -76,6 +76,7 @@ def rag_manager(vertexai_init, test_corpus_name):
 def sample_commit_audit():
     """Sample CommitAudit for integration testing."""
     return CommitAudit(
+        repository="test-owner/test-repo",
         commit_sha="integration-test-sha-12345",
         commit_message="Integration test: Add RAG storage",
         author="Integration Test",
@@ -353,6 +354,7 @@ def test_error_handling_uninit(rag_manager):
     print("\n1️⃣  Attempting store without init...")
     with pytest.raises(RuntimeError, match="Corpus not initialized"):
         sample_audit = CommitAudit(
+            repository="test/repo",
             commit_sha="test",
             commit_message="test",
             author="test",

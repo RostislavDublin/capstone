@@ -51,6 +51,7 @@ class FileAudit(BaseModel):
 class CommitAudit(BaseModel):
     """Audit result for a single commit."""
 
+    repository: str = Field(description="Repository identifier (owner/repo)")
     commit_sha: str = Field(description="Commit SHA")
     commit_message: str = Field(description="Commit message")
     author: str = Field(description="Commit author")

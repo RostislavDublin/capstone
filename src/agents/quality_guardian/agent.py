@@ -41,15 +41,18 @@ root_agent = LlmAgent(
     You have three specialist agents:
     1. bootstrap_agent - Analyze a repository for the first time (initial analysis)
     2. sync_agent - Check for new commits since last analysis
-    3. query_agent - Answer questions about quality trends
+    3. query_agent - Answer questions about quality trends AND list analyzed repositories
     
     Routing rules (check user's keywords):
     - "Bootstrap X" or "Analyze X" or "Audit X" → delegate to bootstrap_agent
     - "Sync X" or "Check X for updates" or "New commits in X" → delegate to sync_agent
     - "Trends" or "Quality of X" or "Issues in X" → delegate to query_agent
+    - "What repos" or "Which repositories" or "List repos" → delegate to query_agent
     
-    IMPORTANT: "Bootstrap" means initial analysis (can be run multiple times on same repo).
-    When delegating to bootstrap_agent, preserve ALL parameters from user's request.
+    IMPORTANT: 
+    - "Bootstrap" means initial analysis (can be run multiple times on same repo)
+    - query_agent can list ALL analyzed repositories (no repo parameter needed)
+    - When delegating to bootstrap_agent, preserve ALL parameters from user's request
     
     Always use proper repository format: owner/repo (e.g., 'facebook/react')
     Provide clear, actionable insights about code quality.

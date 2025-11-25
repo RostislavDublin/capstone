@@ -9,6 +9,47 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _get_rag_tool():
+    """Initialize RAG corpus and return Gemini RAG tool.
+    
+    Shared setup for query_trends and list_analyzed_repositories.
+    
+    Returns:
+        tuple: (rag_manager, rag_tool, stats)
+    """
+    from storage.rag_corpus import RAGCorpusManager
+    from vertexai.generative_models import Tool
+    from vertexai.preview import rag
+    import vertexai
+    
+    project = os.getenv("GOOGLE_CLOUD_PROJECT")
+    if not project:
+        raise ValueError("Missing GOOGLE_CLOUD_PROJECT")
+    
+    vertexai.init(project=project, location="us-west1")
+    rag_mgr = RAGCorpusManager(corpus_name="quality-guardian-audits")
+    rag_mgr.initialize_corpus()
+    
+    # Get corpus stats
+    stats = rag_mgr.get_corpus_stats()
+    
+    # Create RAG retrieval tool
+    rag_tool = Tool.from_retrieval(
+        retrieval=rag.Retrieval(
+            source=rag.VertexRagStore(
+                rag_resources=[
+                    rag.RagResource(
+                        rag_corpus=rag_mgr._corpus_resource_name,
+                    )
+                ],
+                similarity_top_k=50,  # More results for better coverage
+            ),
+        )
+    )
+    
+    return rag_mgr, rag_tool, stats
+
+
 def analyze_repository(repo: str, count: int = 10) -> dict:
     """
     Analyze recent commits from a GitHub repository for quality issues.
@@ -84,7 +125,9 @@ def analyze_repository(repo: str, count: int = 10) -> dict:
         
         for commit in commits:
             audit = engine.audit_commit(repo, commit)
-            rag.store_commit_audit(audit)
+            # Use repo prefix in display_name for uniqueness and fast filtering
+            display_name = f"{repo.replace('/', '_')}_commit_{commit.sha[:7]}.json"
+            rag.store_commit_audit(audit, display_name=display_name)
             
             total_issues += audit.total_issues
             quality_scores.append(audit.quality_score)
@@ -164,7 +207,9 @@ def check_new_commits(repo: str) -> dict:
         
         for commit in new_commits:
             audit = engine.audit_commit(repo, commit)
-            rag.store_commit_audit(audit)
+            # Use repo prefix in display_name for uniqueness and fast filtering
+            display_name = f"{repo.replace('/', '_')}_commit_{commit.sha[:7]}.json"
+            rag.store_commit_audit(audit, display_name=display_name)
             
             total_issues += audit.total_issues
             quality_scores.append(audit.quality_score)
@@ -206,21 +251,10 @@ def query_trends(repo: str, question: str) -> dict:
         AI-generated analysis with corpus stats
     """
     try:
-        from storage.rag_corpus import RAGCorpusManager
-        from vertexai.generative_models import GenerativeModel, Tool
-        from vertexai.preview import rag
-        import vertexai
+        from vertexai.generative_models import GenerativeModel
         
-        project = os.getenv("GOOGLE_CLOUD_PROJECT")
-        if not project:
-            return {"error": "Missing GOOGLE_CLOUD_PROJECT"}
-        
-        vertexai.init(project=project, location="us-west1")
-        rag_mgr = RAGCorpusManager(corpus_name="quality-guardian-audits")
-        rag_mgr.initialize_corpus()
-        
-        # Get basic corpus stats
-        stats = rag_mgr.get_corpus_stats()
+        # Get RAG setup (shared with list_analyzed_repositories)
+        _, rag_tool, stats = _get_rag_tool()
         
         if stats.get("commit_files", 0) == 0:
             return {
@@ -353,21 +387,7 @@ CRITICAL REQUIREMENTS:
 4. Every recommendation MUST cite a specific commit SHA from your data sample
 5. Do NOT invent data - extract it from RAG corpus only"""
         
-        # Create RAG retrieval tool (semantic search)
-        rag_tool = Tool.from_retrieval(
-            retrieval=rag.Retrieval(
-                source=rag.VertexRagStore(
-                    rag_resources=[
-                        rag.RagResource(
-                            rag_corpus=rag_mgr._corpus_resource_name,
-                        )
-                    ],
-                    similarity_top_k=20,  # Get more context for better analysis
-                ),
-            )
-        )
-        
-        # Gemini with RAG grounding (ADK Memory pattern)
+        # Use RAG tool from shared setup (Gemini with RAG grounding)
         model = GenerativeModel(
             model_name="gemini-2.0-flash-001",
             tools=[rag_tool],
@@ -390,3 +410,105 @@ CRITICAL REQUIREMENTS:
     except Exception as e:
         logger.error(f"Query failed: {e}", exc_info=True)
         return {"error": str(e), "message": f"Analysis failed: {e}"}
+
+
+def list_analyzed_repositories() -> dict:
+    """
+    List all repositories that have audit data in the corpus.
+    
+    Use this when user asks:
+    - "What repositories do you have?"
+    - "Which repos are analyzed?"
+    - "Show me all repositories"
+    
+    Returns:
+        List of repositories with analysis stats
+    """
+    try:
+        from vertexai.generative_models import GenerativeModel
+        
+        # Get RAG setup (shared with query_trends)
+        _, rag_tool, stats = _get_rag_tool()
+        total_commits = stats.get("commit_files", 0)
+        
+        if total_commits == 0:
+            return {
+                "status": "no_data",
+                "message": "No repositories have been analyzed yet. Use 'bootstrap' to start analyzing a repository.",
+                "repositories": [],
+                "total_repositories": 0,
+                "total_commits": 0
+            }
+        
+        # Ask Gemini with RAG grounding to extract repository list
+        prompt = f"""You have access to a RAG corpus with {total_commits} commit audit documents.
+
+Each commit audit JSON contains a "repository" field with format "owner/repo" (e.g., "facebook/react", "google/guava").
+
+TASK: Extract ALL unique repository identifiers from the stored commit audits.
+
+OUTPUT FORMAT (return ONLY this, nothing else):
+```json
+{{
+  "repositories": ["owner/repo1", "owner/repo2", ...],
+  "total_repositories": <count>
+}}
+```
+
+RULES:
+- Return valid JSON only
+- List must contain unique repositories (no duplicates)
+- Use exact "owner/repo" format from the "repository" field
+- Sort alphabetically
+
+Extract the repositories now."""
+
+        # Use RAG tool to ground the response
+        model = GenerativeModel(
+            model_name="gemini-2.0-flash-001",
+            tools=[rag_tool],
+        )
+        
+        response = model.generate_content(prompt)
+        ai_response = response.text if hasattr(response, 'text') else str(response)
+        
+        # Parse AI response to extract repository list
+        import re
+        import json
+        
+        # Extract JSON from response (might be wrapped in markdown)
+        json_match = re.search(r'```json\s*(\{.*?\})\s*```', ai_response, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(1)
+        else:
+            # Try to find JSON without markdown wrapper
+            json_match = re.search(r'\{.*"repositories".*\}', ai_response, re.DOTALL)
+            json_str = json_match.group(0) if json_match else ai_response
+        
+        try:
+            result = json.loads(json_str)
+            repos_list = result.get("repositories", [])
+            
+            return {
+                "status": "success",
+                "repositories": repos_list,
+                "total_repositories": len(repos_list),
+                "total_commits": total_commits,
+                "message": f"Found {len(repos_list)} analyzed repositories with {total_commits} total commits"
+            }
+        except json.JSONDecodeError:
+            # Fallback: extract repo patterns from AI text response
+            repos = set(re.findall(r'([a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+)', ai_response))
+            repos_list = sorted(repos)
+            
+            return {
+                "status": "success",
+                "repositories": repos_list,
+                "total_repositories": len(repos_list),
+                "total_commits": total_commits,
+                "message": f"Found {len(repos_list)} analyzed repositories with {total_commits} total commits"
+            }
+        
+    except Exception as e:
+        logger.error(f"Failed to list repositories: {e}", exc_info=True)
+        return {"error": str(e), "message": f"Could not list repositories: {e}"}

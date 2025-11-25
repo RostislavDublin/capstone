@@ -69,15 +69,15 @@ def load_config(env_file: Optional[str] = None) -> AppConfig:
     """Load configuration from environment variables.
     
     Args:
-        env_file: Path to .env file. If None, uses .env.dev for local or .env for deployment.
+        env_file: Path to .env file. If None, uses .env from current directory.
         
     Returns:
         Loaded application configuration.
     """
     if env_file is None:
         # Auto-detect environment
-        if os.path.exists(".env.dev"):
-            env_file = ".env.dev"
+        if os.path.exists(".env"):
+            env_file = ".env"
         else:
             env_file = ".env"
     

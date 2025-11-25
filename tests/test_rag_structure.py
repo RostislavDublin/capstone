@@ -9,7 +9,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Setup
-load_dotenv(Path(__file__).parent.parent / ".env.dev")
+load_dotenv(Path(__file__).parent.parent / ".env")
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import vertexai
