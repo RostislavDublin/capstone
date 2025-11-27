@@ -119,15 +119,37 @@ def analyze_repository(repo: str, count: int = 10) -> dict:
         rag = RAGCorpusManager(corpus_name="quality-guardian-audits")
         rag.initialize_corpus()
         
+        # Initialize Firestore (primary storage)
+        from storage.firestore_client import FirestoreAuditDB
+        firestore_db = FirestoreAuditDB(
+            project_id=project,
+            database="(default)",
+            collection_prefix="quality-guardian"
+        )
+        
         # Analyze commits
         total_issues = 0
         quality_scores = []
         
         for commit in commits:
             audit = engine.audit_commit(repo, commit)
-            # Use repo prefix in display_name for uniqueness and fast filtering
-            display_name = f"{repo.replace('/', '_')}_commit_{commit.sha[:7]}.json"
-            rag.store_commit_audit(audit, display_name=display_name)
+            
+            # Primary write: Firestore (source of truth)
+            try:
+                firestore_db.store_commit_audit(audit)
+                logger.debug(f"✓ Stored in Firestore: {commit.sha[:7]}")
+            except Exception as e:
+                logger.error(f"✗ Firestore write failed for {commit.sha[:7]}: {e}")
+                # Don't fail - continue to RAG
+            
+            # Secondary write: RAG (semantic search cache, best-effort)
+            try:
+                display_name = f"{repo.replace('/', '_')}_commit_{commit.sha[:7]}.json"
+                rag.store_commit_audit(audit, display_name=display_name)
+                logger.debug(f"✓ Stored in RAG: {commit.sha[:7]}")
+            except Exception as e:
+                logger.warning(f"✗ RAG write failed for {commit.sha[:7]}: {e}")
+                # Continue - RAG is optional cache
             
             total_issues += audit.total_issues
             quality_scores.append(audit.quality_score)
@@ -414,7 +436,7 @@ CRITICAL REQUIREMENTS:
 
 def list_analyzed_repositories() -> dict:
     """
-    List all repositories that have audit data in the corpus.
+    List all repositories that have audit data stored.
     
     Use this when user asks:
     - "What repositories do you have?"
@@ -425,89 +447,52 @@ def list_analyzed_repositories() -> dict:
         List of repositories with analysis stats
     """
     try:
-        from vertexai.generative_models import GenerativeModel
+        from storage.firestore_client import FirestoreAuditDB
+        import vertexai
         
-        # Get RAG setup (shared with query_trends)
-        _, rag_tool, stats = _get_rag_tool()
-        total_commits = stats.get("commit_files", 0)
+        project = os.getenv("GOOGLE_CLOUD_PROJECT")
+        if not project:
+            return {"error": "Missing GOOGLE_CLOUD_PROJECT"}
         
-        if total_commits == 0:
-            return {
-                "status": "no_data",
-                "message": "No repositories have been analyzed yet. Use 'bootstrap' to start analyzing a repository.",
-                "repositories": [],
-                "total_repositories": 0,
-                "total_commits": 0
-            }
+        vertexai.init(project=project, location="us-west1")
         
-        # Ask Gemini with RAG grounding to extract repository list
-        prompt = f"""You have access to a RAG corpus with {total_commits} commit audit documents.
-
-Each commit audit JSON contains a "repository" field with format "owner/repo" (e.g., "facebook/react", "google/guava").
-
-TASK: Extract ALL unique repository identifiers from the stored commit audits.
-
-OUTPUT FORMAT (return ONLY this, nothing else):
-```json
-{{
-  "repositories": ["owner/repo1", "owner/repo2", ...],
-  "total_repositories": <count>
-}}
-```
-
-RULES:
-- Return valid JSON only
-- List must contain unique repositories (no duplicates)
-- Use exact "owner/repo" format from the "repository" field
-- Sort alphabetically
-
-Extract the repositories now."""
-
-        # Use RAG tool to ground the response
-        model = GenerativeModel(
-            model_name="gemini-2.0-flash-001",
-            tools=[rag_tool],
+        # Read from Firestore (primary storage)
+        firestore_db = FirestoreAuditDB(
+            project_id=project,
+            database="(default)",
+            collection_prefix="quality-guardian"
         )
         
-        response = model.generate_content(prompt)
-        ai_response = response.text if hasattr(response, 'text') else str(response)
+        repositories = firestore_db.get_repositories()
         
-        # Parse AI response to extract repository list
-        import re
-        import json
-        
-        # Extract JSON from response (might be wrapped in markdown)
-        json_match = re.search(r'```json\s*(\{.*?\})\s*```', ai_response, re.DOTALL)
-        if json_match:
-            json_str = json_match.group(1)
-        else:
-            # Try to find JSON without markdown wrapper
-            json_match = re.search(r'\{.*"repositories".*\}', ai_response, re.DOTALL)
-            json_str = json_match.group(0) if json_match else ai_response
-        
-        try:
-            result = json.loads(json_str)
-            repos_list = result.get("repositories", [])
-            
+        if not repositories:
             return {
-                "status": "success",
-                "repositories": repos_list,
-                "total_repositories": len(repos_list),
-                "total_commits": total_commits,
-                "message": f"Found {len(repos_list)} analyzed repositories with {total_commits} total commits"
+                "status": "no_data",
+                "message": "No repositories have been analyzed yet. Use 'analyze_repository' to start.",
+                "repositories": [],
+                "total_repositories": 0
             }
-        except json.JSONDecodeError:
-            # Fallback: extract repo patterns from AI text response
-            repos = set(re.findall(r'([a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+)', ai_response))
-            repos_list = sorted(repos)
-            
-            return {
-                "status": "success",
-                "repositories": repos_list,
-                "total_repositories": len(repos_list),
-                "total_commits": total_commits,
-                "message": f"Found {len(repos_list)} analyzed repositories with {total_commits} total commits"
-            }
+        
+        # Get stats for each repository from Firestore
+        repo_stats = []
+        total_commits = 0
+        for repo in repositories:
+            stats = firestore_db.get_repository_stats(repo)
+            if stats:
+                total_commits += stats["total_commits"]
+                repo_stats.append({
+                    "repository": repo,
+                    "total_commits": stats["total_commits"],
+                    "last_analyzed": stats["last_analyzed"].isoformat() if stats.get("last_analyzed") else None
+                })
+        
+        return {
+            "status": "success",
+            "repositories": repo_stats,
+            "total_repositories": len(repositories),
+            "total_commits": total_commits,
+            "message": f"Found {len(repositories)} analyzed repositories with {total_commits} total commits"
+        }
         
     except Exception as e:
         logger.error(f"Failed to list repositories: {e}", exc_info=True)
