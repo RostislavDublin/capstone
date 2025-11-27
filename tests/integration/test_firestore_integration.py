@@ -2,6 +2,7 @@
 
 import pytest
 import os
+import time
 from datetime import datetime
 
 import sys
@@ -60,8 +61,13 @@ def test_store_and_retrieve_commit(firestore_db, sample_audit):
     # Store commit
     firestore_db.store_commit_audit(sample_audit)
     
-    # Retrieve commits
-    audits = firestore_db.query_by_repository("test-org/test-repo", limit=10)
+    # Wait for Firestore eventual consistency with exponential backoff
+    audits = []
+    for attempt in range(5):
+        audits = firestore_db.query_by_repository("test-org/test-repo", limit=10)
+        if len(audits) >= 1:
+            break
+        time.sleep(0.5 * (2 ** attempt))  # 0.5s, 1s, 2s, 4s, 8s
     
     assert len(audits) >= 1
     retrieved = audits[0]
@@ -213,8 +219,14 @@ def test_query_with_limit(firestore_db):
         )
         firestore_db.store_commit_audit(audit)
     
-    # Query with limit
-    limited = firestore_db.query_by_repository("test-org/limit-test", limit=5)
+    # Wait for Firestore eventual consistency with exponential backoff
+    limited = []
+    for attempt in range(5):
+        limited = firestore_db.query_by_repository("test-org/limit-test", limit=5)
+        if len(limited) == 5:
+            break
+        time.sleep(0.5 * (2 ** attempt))  # 0.5s, 1s, 2s, 4s, 8s
+    
     assert len(limited) == 5
     
     # Query without limit

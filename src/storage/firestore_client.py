@@ -120,7 +120,7 @@ class FirestoreAuditDB:
         self,
         repository: str,
         limit: Optional[int] = None,
-        order_by: str = "timestamp",
+        order_by: str = "date",
         descending: bool = True
     ) -> List[CommitAudit]:
         """Query commit audits for a specific repository.

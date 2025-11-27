@@ -347,6 +347,91 @@ gcloud services enable firestore.googleapis.com     # Firestore
 gcloud services enable logging.googleapis.com       # Cloud Logging
 ```
 
+**Create and configure Service Account:**
+
+The application uses a service account for authentication with GCP services. You need to create one with appropriate permissions:
+
+1. **Create Service Account:**
+   - Go to [IAM & Admin > Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts)
+   - Click **+ CREATE SERVICE ACCOUNT**
+   - Name: `agent-deployment` (or any descriptive name)
+   - Description: "Quality Guardian AI agent deployment and runtime"
+   - Click **CREATE AND CONTINUE**
+
+2. **Grant Required Roles:**
+   
+   The service account needs these roles to function properly:
+   
+   - **Cloud Run Admin** (`roles/run.admin`)
+     - Reason: For deploying agents to Cloud Run (if using Cloud Run deployment)
+   
+   - **Cloud Datastore User** (`roles/datastore.user`)
+     - Reason: Read/write access to Firestore for audit data storage
+   
+   - **Service Account User** (`roles/iam.serviceAccountUser`)
+     - Reason: Required to run services as this service account
+   
+   - **Storage Admin** (`roles/storage.admin`)
+     - Reason: Manage Cloud Storage buckets for RAG corpus data
+   
+   - **Vertex AI User** (`roles/aiplatform.user`)
+     - Reason: Access Gemini models and RAG APIs
+   
+   Add each role by clicking **+ ADD ANOTHER ROLE** and searching for the role name.
+   
+   Click **CONTINUE** → **DONE**
+
+3. **Generate JSON Key:**
+   - Click on the created service account
+   - Go to **KEYS** tab
+   - Click **ADD KEY** → **Create new key**
+   - Choose **JSON** format
+   - Click **CREATE**
+   - Save the downloaded file as `service-account-key.json` in project root
+
+4. **Configure Environment:**
+   ```bash
+   # In your .env file
+   GOOGLE_APPLICATION_CREDENTIALS=./service-account-key.json
+   GOOGLE_CLOUD_PROJECT=your-project-id
+   ```
+
+**Security Note:** Never commit `service-account-key.json` to git. It's already in `.gitignore`.
+
+### First-Time Setup
+
+After enabling APIs, you need to create the required GCP resources:
+
+**1. Create Firestore Database**
+
+Visit: https://console.cloud.google.com/datastore/setup?project=YOUR_PROJECT_ID
+
+- Choose **Firestore Native Mode** (NOT Datastore mode)
+- Select region: **us-west1** (or same as your Vertex AI region)
+- Database ID: **(default)**
+
+**2. Create RAG Corpus**
+
+The RAG corpus is created automatically on first use, but you can create it manually:
+
+```bash
+# Set your project
+export GOOGLE_CLOUD_PROJECT=your-project-id
+
+# Run bootstrap to create corpus
+python demos/demo_quality_guardian_agent.py
+# Then type: "Bootstrap test-org/test-repo with 1 commit"
+```
+
+**Verify setup:**
+```bash
+# Check Firestore
+gcloud firestore databases list
+
+# Check RAG corpus (after bootstrap)
+python scripts/check_corpus_state.py
+```
+
 ### Usage: Talk to the Agent
 
 **Deployment:** Agent runs on Vertex AI Agent Engine
