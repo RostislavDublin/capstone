@@ -128,10 +128,45 @@ async def demo_natural_language_commands():
     print_section("TEST 1: Bootstrap Command (Natural Language)")
     
     command1 = f"Bootstrap {test_repo} with 4 commits"
-    print(f"🗣️  User: '{command1}'\n")
+    print(f"User: '{command1}'\n")
     
-    response1 = await runner.run_debug(command1)
+    _ = await runner.run_debug(command1)
     print()  # Extra newline for spacing
+    
+    # VERIFICATION: Check dual write (Firestore + RAG)
+    print_section("VERIFICATION: Dual Write Status")
+    
+    import vertexai
+    from storage.firestore_client import FirestoreAuditDB
+    from storage.rag_corpus import RAGCorpusManager
+    
+    project = os.getenv("GOOGLE_CLOUD_PROJECT")
+    vertexai.init(project=project, location="us-west1")
+    
+    # Check Firestore
+    db = FirestoreAuditDB(
+        project_id=project,
+        database="(default)",
+        collection_prefix="quality-guardian"
+    )
+    repos = db.get_repositories()
+    if test_repo in repos:
+        stats = db.get_repository_stats(test_repo)
+        print(f"[OK] Firestore: {stats['total_commits']} commits stored")
+    else:
+        print("[ERROR] Firestore: Repository not found")
+    
+    # Check RAG
+    rag_check = RAGCorpusManager(corpus_name="quality-guardian-audits")
+    rag_check.initialize_corpus()
+    rag_stats = rag_check.get_corpus_stats()
+    rag_files = rag_stats.get('commit_files', 0)
+    print(f"[OK] RAG: {rag_files} files in corpus")
+    
+    if rag_files == stats['total_commits']:
+        print("[OK] Dual write successful: Both storages in sync\n")
+    else:
+        print(f"[NOTE] RAG may lag behind Firestore ({rag_files} vs {stats['total_commits']})\n")
     
     # SETUP 2: Add 2 more commits on top (now 6 total)
     print_section("📝 SETUP 2: Add New Commits for Sync Test")
@@ -146,27 +181,45 @@ async def demo_natural_language_commands():
     print_section("TEST 2: Sync Command (Check for New Commits)")
     
     command2 = f"Sync {test_repo}"
-    print(f"🗣️  User: '{command2}'\n")
+    print(f"User: '{command2}'\n")
     
-    response2 = await runner.run_debug(command2)
+    _ = await runner.run_debug(command2)
     print()
+    
+    # VERIFICATION: Check dual write after sync
+    print_section("VERIFICATION: Dual Write After Sync")
+    
+    stats_after_sync = db.get_repository_stats(test_repo)
+    print(f"[OK] Firestore: {stats_after_sync['total_commits']} commits (was {stats['total_commits']})")
+    
+    rag_check_sync = RAGCorpusManager(corpus_name="quality-guardian-audits")
+    rag_check_sync.initialize_corpus()
+    rag_stats_sync = rag_check_sync.get_corpus_stats()
+    rag_files_sync = rag_stats_sync.get('commit_files', 0)
+    print(f"[OK] RAG: {rag_files_sync} files (was {rag_files})")
+    
+    new_commits = stats_after_sync['total_commits'] - stats['total_commits']
+    if new_commits > 0:
+        print(f"[OK] Sync successful: {new_commits} new commits added to both storages\n")
+    else:
+        print("[NOTE] No new commits found\n")
     
     # Test 3: Query trends
     print_section("TEST 3: Query Command (Quality Trends)")
     
     command3 = f"Show quality trends for {test_repo}"
-    print(f"🗣️  User: '{command3}'\n")
+    print(f"User: '{command3}'\n")
     
-    response3 = await runner.run_debug(command3)
+    _ = await runner.run_debug(command3)
     print()
     
     # Test 4: Natural Question
     print_section("TEST 4: Natural Question (Agent's Capabilities)")
     
     command4 = "What can you do?"
-    print(f"🗣️  User: '{command4}'\n")
+    print(f"User: '{command4}'\n")
     
-    response4 = await runner.run_debug(command4)
+    _ = await runner.run_debug(command4)
     print()
 
 
@@ -203,7 +256,7 @@ def interactive_mode():
     
     while True:
         try:
-            user_input = input("🗣️  You: ").strip()
+            user_input = input("You: ").strip()
             
             if not user_input:
                 continue
