@@ -34,6 +34,19 @@ class DeploymentConfig(BaseModel):
     region: str = Field(default_factory=lambda: os.getenv("DEPLOYMENT_REGION", "us-central1"))
 
 
+class FirestoreConfig(BaseModel):
+    """Configuration for Firestore database."""
+    
+    database: str = Field(
+        default_factory=lambda: os.getenv("FIRESTORE_DATABASE", "(default)"),
+        description="Firestore database ID. Use '(default)' for default database."
+    )
+    collection_prefix: str = Field(
+        default="quality-guardian",
+        description="Prefix for Firestore collections"
+    )
+
+
 class TestFixtureConfig(BaseModel):
     """Test fixture repository configuration."""
     remote_repo: str = Field(
@@ -60,6 +73,7 @@ class AppConfig(BaseModel):
     github: GitHubConfig
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
     deployment: Optional[DeploymentConfig] = None
+    firestore: FirestoreConfig = Field(default_factory=FirestoreConfig)
     test_fixture: TestFixtureConfig = Field(default_factory=TestFixtureConfig)
     log_level: str = Field(default="INFO")
     enable_tracing: bool = Field(default=True)
@@ -106,6 +120,10 @@ def load_config(env_file: Optional[str] = None) -> AppConfig:
             session_timeout=int(os.getenv("SESSION_TIMEOUT", "3600")),
         ),
         deployment=deployment_config,
+        firestore=FirestoreConfig(
+            database=os.getenv("FIRESTORE_DATABASE", "(default)"),
+            collection_prefix=os.getenv("FIRESTORE_COLLECTION_PREFIX", "quality-guardian"),
+        ),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
         enable_tracing=os.getenv("ENABLE_TRACING", "true").lower() == "true",
     )
