@@ -43,6 +43,8 @@ logging.basicConfig(
 logging.getLogger("asyncio").setLevel(logging.CRITICAL)
 logging.getLogger("google_adk").setLevel(logging.CRITICAL)
 logging.getLogger("google.adk").setLevel(logging.CRITICAL)
+logging.getLogger("google_genai.types").setLevel(logging.ERROR)
+logging.getLogger("stevedore.extension").setLevel(logging.ERROR)
 logging.getLogger("google_genai").setLevel(logging.CRITICAL)
 
 
@@ -78,7 +80,7 @@ async def demo_query_capabilities():
     print("RAG corpus: quality-guardian-audits")
     
     # Create runner
-    runner = InMemoryRunner(agent=root_agent)
+    runner = InMemoryRunner(agent=root_agent, app_name="quality_guardian")
     
     # Define test queries showcasing different capabilities
     queries = [

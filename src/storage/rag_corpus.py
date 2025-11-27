@@ -499,7 +499,7 @@ class RAGCorpusManager:
         try:
             # List files to get count
             files = list(rag.list_files(corpus_name=self._corpus_resource_name))
-            commit_files = [f for f in files if f.display_name.startswith("commit_")]
+            commit_files = [f for f in files if "_commit_" in f.display_name]
             
             return {
                 "total_files": len(files),

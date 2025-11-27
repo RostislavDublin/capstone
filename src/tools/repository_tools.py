@@ -148,7 +148,7 @@ def analyze_repository(repo: str, count: int = 10) -> dict:
                 rag.store_commit_audit(audit, display_name=display_name)
                 logger.debug(f"✓ Stored in RAG: {commit.sha[:7]}")
             except Exception as e:
-                logger.warning(f"✗ RAG write failed for {commit.sha[:7]}: {e}")
+                logger.warning(f"RAG write failed for {commit.sha[:7]}: {e}", exc_info=True)
                 # Continue - RAG is optional cache
             
             total_issues += audit.total_issues

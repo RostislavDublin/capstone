@@ -56,7 +56,10 @@ logging.getLogger("asyncio").setLevel(logging.CRITICAL)
 logging.getLogger("google_adk").setLevel(logging.CRITICAL)
 logging.getLogger("google.adk").setLevel(logging.CRITICAL)
 logging.getLogger("google_genai").setLevel(logging.CRITICAL)
+logging.getLogger("google_genai.types").setLevel(logging.ERROR)
+logging.getLogger("google_adk.google.adk.runners").setLevel(logging.ERROR)
 logging.getLogger("stevedore").setLevel(logging.CRITICAL)
+logging.getLogger("stevedore.extension").setLevel(logging.CRITICAL)
 logging.getLogger("agent").setLevel(logging.WARNING)
 logging.getLogger("storage.rag_corpus").setLevel(logging.WARNING)
 logging.getLogger("fixtures.test_repo_fixture").setLevel(logging.WARNING)
@@ -106,7 +109,7 @@ async def demo_natural_language_commands():
     test_repo = get_test_repo_name()
     
     # Create runner (proper ADK pattern from reference notebooks)
-    runner = InMemoryRunner(agent=root_agent)
+    runner = InMemoryRunner(agent=root_agent, app_name="quality_guardian")
     print("✅ Agent runner ready (ADK)\n")
     
     # SETUP 1: Reset to 3 fixture commits for bootstrap
