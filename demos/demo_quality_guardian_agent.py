@@ -72,27 +72,43 @@ def print_section(title: str):
     print("=" * 80 + "\n")
 
 
-def clean_rag_corpus():
-    """Clean RAG corpus before demo."""
+def clean_all_storage():
+    """Clean both Firestore and RAG corpus before demo."""
     try:
         import vertexai
         from storage.rag_corpus import RAGCorpusManager
+        from storage.firestore_client import FirestoreAuditDB
         
         project = os.getenv("GOOGLE_CLOUD_PROJECT")
         location = os.getenv("VERTEX_LOCATION", "us-west1")
         vertexai.init(project=project, location=location)
         
+        # Clean Firestore
+        db = FirestoreAuditDB(
+            project_id=project,
+            database="(default)",
+            collection_prefix="quality-guardian"
+        )
+        repos = db.get_repositories()
+        for repo in repos:
+            db.delete_repository(repo)
+        if len(repos) > 0:
+            print(f"[OK] Cleared {len(repos)} repository(ies) from Firestore")
+        else:
+            print("[OK] Firestore is empty (clean slate)")
+        
+        # Clean RAG
         rag_manager = RAGCorpusManager(corpus_name="quality-guardian-audits")
         rag_manager.initialize_corpus()
         
         files_deleted = rag_manager.clear_all_files()
         if files_deleted > 0:
-            print(f"✅ Cleared {files_deleted} file(s) from RAG corpus")
+            print(f"[OK] Cleared {files_deleted} file(s) from RAG corpus")
         else:
-            print("ℹ️  RAG corpus is empty (clean slate)")
+            print("[OK] RAG corpus is empty (clean slate)")
     except Exception as e:
-        print(f"⚠️  Could not clear corpus: {e}")
-        logger.warning(f"Corpus cleanup failed: {e}")
+        print(f"[ERROR] Could not clear storage: {e}")
+        logger.warning(f"Storage cleanup failed: {e}")
 
 
 async def demo_natural_language_commands():
@@ -120,9 +136,23 @@ async def demo_natural_language_commands():
     reset_to_fixture_state_api(initial_commits=3)
     print(f"✅ Repository ready: {test_repo} with 4 commits (initial + 3 fixtures)\n")
     
-    print("Cleaning RAG corpus...")
-    clean_rag_corpus()
+    print("Cleaning storage (Firestore + RAG)...")
+    clean_all_storage()
     print()
+    
+    # Setup verification tools
+    import vertexai
+    from storage.firestore_client import FirestoreAuditDB
+    from storage.rag_corpus import RAGCorpusManager
+    
+    project = os.getenv("GOOGLE_CLOUD_PROJECT")
+    vertexai.init(project=project, location="us-west1")
+    
+    db = FirestoreAuditDB(
+        project_id=project,
+        database="(default)",
+        collection_prefix="quality-guardian"
+    )
     
     # Test 1: Bootstrap with 4 commits (initial + 3 fixtures)
     print_section("TEST 1: Bootstrap Command (Natural Language)")
@@ -135,20 +165,6 @@ async def demo_natural_language_commands():
     
     # VERIFICATION: Check dual write (Firestore + RAG)
     print_section("VERIFICATION: Dual Write Status")
-    
-    import vertexai
-    from storage.firestore_client import FirestoreAuditDB
-    from storage.rag_corpus import RAGCorpusManager
-    
-    project = os.getenv("GOOGLE_CLOUD_PROJECT")
-    vertexai.init(project=project, location="us-west1")
-    
-    # Check Firestore
-    db = FirestoreAuditDB(
-        project_id=project,
-        database="(default)",
-        collection_prefix="quality-guardian"
-    )
     repos = db.get_repositories()
     if test_repo in repos:
         stats = db.get_repository_stats(test_repo)

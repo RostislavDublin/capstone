@@ -223,15 +223,35 @@ def check_new_commits(repo: str) -> dict:
         
         logger.info(f"Found {len(new_commits)} new commits in {repo}")
         
-        # Analyze new commits
+        # Initialize Firestore (primary storage)
+        from storage.firestore_client import FirestoreAuditDB
+        firestore_db = FirestoreAuditDB(
+            project_id=project,
+            database="(default)",
+            collection_prefix="quality-guardian"
+        )
+        
+        # Analyze new commits with dual write
         total_issues = 0
         quality_scores = []
         
         for commit in new_commits:
             audit = engine.audit_commit(repo, commit)
-            # Use repo prefix in display_name for uniqueness and fast filtering
-            display_name = f"{repo.replace('/', '_')}_commit_{commit.sha[:7]}.json"
-            rag.store_commit_audit(audit, display_name=display_name)
+            
+            # Primary write: Firestore (source of truth)
+            try:
+                firestore_db.store_commit_audit(audit)
+                logger.debug(f"Stored in Firestore: {commit.sha[:7]}")
+            except Exception as e:
+                logger.error(f"Firestore write failed for {commit.sha[:7]}: {e}")
+            
+            # Secondary write: RAG (semantic search cache, best-effort)
+            try:
+                display_name = f"{repo.replace('/', '_')}_commit_{commit.sha[:7]}.json"
+                rag.store_commit_audit(audit, display_name=display_name)
+                logger.debug(f"Stored in RAG: {commit.sha[:7]}")
+            except Exception as e:
+                logger.warning(f"RAG write failed for {commit.sha[:7]}: {e}", exc_info=True)
             
             total_issues += audit.total_issues
             quality_scores.append(audit.quality_score)
