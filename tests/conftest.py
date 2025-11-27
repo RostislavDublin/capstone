@@ -2,7 +2,17 @@
 
 import pytest
 import sys
+import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file for all tests
+env_file = Path(__file__).parent.parent / ".env"
+if env_file.exists():
+    load_dotenv(env_file)
+    print(f"✅ Loaded test environment from {env_file}")
+else:
+    print(f"⚠️  No .env found at {env_file}")
 
 # Add src to path for imports
 src_path = Path(__file__).parent.parent / "src"

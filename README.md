@@ -333,9 +333,19 @@ pytest tests/integration/       # Integration tests only
 ### Prerequisites
 
 - Python 3.11+
-- Google Cloud account with Vertex AI enabled
+- Google Cloud account with required APIs enabled:
+  - **Vertex AI API** (for Gemini models and RAG)
+  - **Cloud Firestore API** (for audit data storage)
+  - **Cloud Logging API** (for production logging)
 - GitHub account and personal access token
 - ADK CLI installed
+
+**Enable required APIs:**
+```bash
+gcloud services enable aiplatform.googleapis.com    # Vertex AI
+gcloud services enable firestore.googleapis.com     # Firestore
+gcloud services enable logging.googleapis.com       # Cloud Logging
+```
 
 ### Usage: Talk to the Agent
 
