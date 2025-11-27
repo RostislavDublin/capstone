@@ -51,15 +51,21 @@
 
 ---
 
-## Phase 5: Query Trends Refactoring (30 min)
+## Phase 5: Query Trends Refactoring (30 min)  
 **Goal:** Query trends uses Firestore + RAG
 
-- [ ] 1. Refactor `query_trends()`: fetch from Firestore first
-- [ ] 2. Pass fetched commits to Gemini with RAG grounding
+- [x] 1. Refactor `query_trends()`: fetch from Firestore first
+- [x] 2. Pass fetched commits to Gemini with RAG grounding
 - [ ] 3. Update tests
 - [ ] 4. Run full demo → everything works end-to-end
 
 **Deliverable:** Fully working system
+
+**Implementation:**
+- Firestore provides reliable structured data (commits, dates, scores)
+- Data passed explicitly in prompt (no search uncertainty)
+- RAG used for semantic details (file-level issues, patterns)
+- Simplified prompt - no complex extraction needed
 
 ---
 

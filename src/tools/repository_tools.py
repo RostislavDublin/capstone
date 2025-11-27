@@ -273,169 +273,128 @@ def check_new_commits(repo: str) -> dict:
 
 def query_trends(repo: str, question: str) -> dict:
     """
-    Query quality trends using Gemini with RAG grounding (ADK Memory pattern).
+    Query quality trends using Firestore data + Gemini analysis with RAG grounding.
     
-    CORRECT APPROACH (per ADK Memory docs):
-    - RAG provides semantic search over stored audit history
-    - Gemini analyzes trends using RAG-grounded context
-    - No manual JSON parsing - let RAG + Gemini do the work
+    HYBRID APPROACH (Firestore + RAG):
+    - Firestore provides reliable structured data (commits, dates, scores)
+    - Data passed explicitly to Gemini in prompt (no search uncertainty)
+    - RAG used for semantic details (file-level issues, patterns)
+    - Gemini analyzes trends with full context
     
-    This pattern mirrors ADK's Memory system:
-    - Store: commit audits saved to RAG corpus
-    - Retrieve: semantic search finds relevant audits  
-    - Analyze: Gemini extracts insights with RAG grounding
+    This ensures:
+    - No "data not found" errors (Firestore is deterministic)
+    - Rich semantic context (RAG for details)
+    - Accurate calculations (structured data in prompt)
     
     Args:
         repo: Repository identifier
         question: Question about quality trends (natural language)
     
     Returns:
-        AI-generated analysis with corpus stats
+        AI-generated analysis with commit data from Firestore
     """
     try:
         from vertexai.generative_models import GenerativeModel
+        from storage.firestore_client import FirestoreAuditDB
+        import vertexai
         
-        # Get RAG setup (shared with list_analyzed_repositories)
-        _, rag_tool, stats = _get_rag_tool()
+        # Initialize
+        project = os.getenv("GOOGLE_CLOUD_PROJECT")
+        vertexai.init(project=project, location="us-west1")
         
-        if stats.get("commit_files", 0) == 0:
+        # Get commits from Firestore (primary source)
+        db = FirestoreAuditDB(
+            project_id=project,
+            database="(default)",
+            collection_prefix="quality-guardian"
+        )
+        
+        # Check if repo exists
+        repos = db.get_repositories()
+        if repo not in repos:
             return {
                 "status": "no_data",
-                "message": f"No audit data found for {repo}. Run bootstrap or sync first.",
-                "corpus_stats": stats
+                "message": f"No audit data found for {repo}. Run bootstrap or sync first."
             }
         
-        logger.info(f"Querying trends for {repo}: {stats['commit_files']} commits in corpus")
+        # Get commits (up to 50 for analysis)
+        commits = db.query_by_repository(repo, limit=50, order_by="date")
+        if not commits:
+            return {
+                "status": "no_data",
+                "message": f"No commits found in {repo}. Database may be empty."
+            }
         
-        # Build comprehensive prompt with data extraction instructions
+        logger.info(f"Querying trends for {repo}: {len(commits)} commits from Firestore")
+        
+        # Format commit data for prompt (most recent first)
+        commits_reversed = list(reversed(commits))  # Newest first
+        commit_data_str = "\n".join([
+            f"{i+1}. SHA: {c.commit_sha[:7]} | Date: {c.date.isoformat()} | "
+            f"Quality: {c.quality_score}/100 | Issues: {c.total_issues} | "
+            f"Author: {c.author}"
+            for i, c in enumerate(commits_reversed[:20])  # Show recent 20
+        ])
+        
+        # Calculate basic stats
+        recent_scores = [c.quality_score for c in commits_reversed[:5]]
+        older_scores = [c.quality_score for c in commits_reversed[5:10]] if len(commits) > 5 else []
+        
+        recent_avg = sum(recent_scores) / len(recent_scores) if recent_scores else 0
+        older_avg = sum(older_scores) / len(older_scores) if older_scores else recent_avg
+        
+        # Get RAG tool for semantic details
+        _, rag_tool, _ = _get_rag_tool()
+        
+        # Build prompt with Firestore data + RAG grounding
         prompt = f"""You are analyzing code quality trends for repository: {repo}
 
-CORPUS INFORMATION:
-- Total commit audits stored: {stats['commit_files']}
-- Repository: {repo}
+COMMIT DATA (from Firestore, {len(commits)} total commits):
+
+```
+{commit_data_str}
+```
+
+STATISTICS:
+- Total commits analyzed: {len(commits)}
+- Recent average quality (last 5): {recent_avg:.1f}/100
+- Historical average quality: {older_avg:.1f}/100
+- Trend: {"IMPROVING" if recent_avg > older_avg + 2 else "DECLINING" if recent_avg < older_avg - 2 else "STABLE"}
 
 USER QUESTION: {question}
 
-STEP-BY-STEP ANALYSIS ALGORITHM:
+ANALYSIS TASK:
 
-STEP 1: DATA EXTRACTION
-From the RAG corpus commit audit data, extract for EACH commit:
-- commit_sha (string)
-- date (ISO format timestamp)
-- quality_score (0-100 float)
-- total_issues (integer)
-- critical_issues (integer)
-- security_issues (list/count)
-- complexity_issues (list/count)
-- author (string)
-- files (list of changed files with their issues)
+Using the commit data above and RAG corpus for detailed issue information, analyze:
 
-STEP 2: TEMPORAL ORDERING
-Sort commits by date (newest first). Identify:
-- Recent commits: last 3-5 commits
-- Historical commits: older commits for comparison
+1. **Quality Trend**: Is code quality improving, declining, or stable?
+2. **Issue Patterns**: What types of issues are most common?
+3. **Problem Areas**: Which files/components need attention?
+4. **Actionable Recommendations**: Specific actions to improve quality
 
-STEP 3: TREND CALCULATION
-Calculate trend direction using this algorithm:
-```
-recent_avg_quality = average(quality_score of last 3-5 commits)
-historical_avg_quality = average(quality_score of all older commits)
-trend_delta = recent_avg_quality - historical_avg_quality
+OUTPUT FORMAT:
 
-if trend_delta > 5: trend = "IMPROVING"
-elif trend_delta < -5: trend = "DEGRADING"
-else: trend = "STABLE"
-```
+**TREND ANALYSIS**
 
-STEP 4: PATTERN DETECTION
-Analyze the extracted data to find:
-- Most frequent security issue types (e.g., "SQL injection", "hardcoded password")
-- Most frequent complexity issues (high complexity functions)
-- Files that appear in multiple commits with issues (hotspots)
-- Authors with highest/lowest average quality scores
+Based on the statistics above, describe the quality trend and what's driving it.
 
-STEP 5: ACTIONABLE INSIGHTS
-Based on patterns, recommend:
-- Which critical issues to fix first (cite specific commits/files)
-- Which files need refactoring (most problematic)
-- What coding practices to improve
+- Issue types and frequencies (use RAG to find specific issue details)
+- Problematic files or components (cite commit SHAs)
+- Any patterns in authorship or timing
 
-===== MANDATORY OUTPUT FORMAT (FOLLOW EXACTLY) =====
+**RECOMMENDATIONS**
 
-YOU MUST START WITH THIS SECTION - NO EXCEPTIONS:
+Specific, actionable steps to improve code quality, referencing commits and files where appropriate.
 
-**📊 DATA SAMPLE (PROOF OF GROUNDING)**
-
-Extract commit data from RAG corpus and list here. Example format:
-
-```
-Recent Commits (last 3, newest first):
-1. SHA: b751439 | Date: 2024-11-22T15:30 | Quality: 89.5/100 | Issues: 3 | Author: John Doe
-2. SHA: a7454cf | Date: 2024-11-22T14:20 | Quality: 87.3/100 | Issues: 5 | Author: Jane Smith  
-3. SHA: 8439d23 | Date: 2024-11-22T13:10 | Quality: 86.1/100 | Issues: 4 | Author: John Doe
-
-Historical Commits (older, for baseline):
-1. SHA: 65cdf3b | Date: 2024-11-21T10:00 | Quality: 92.0/100 | Issues: 2 | Author: Jane Smith
-2. SHA: 20c7b25 | Date: 2024-11-20T09:00 | Quality: 88.5/100 | Issues: 3 | Author: Bob Wilson
-```
-
-⚠️ CRITICAL RULES:
-- Use ACTUAL commit SHAs from RAG (not invented examples)
-- Extract REAL dates, scores, issue counts from audit data
-- If RAG has fewer commits, list what's available
-- DO NOT proceed without this section
-
----
-
-**📈 TREND ANALYSIS** (calculated from data above)
-
-Show your calculation explicitly:
-
-```
-Recent avg = (89.5 + 87.3 + 86.1) / 3 = 87.6
-Historical avg = (92.0 + 88.5) / 2 = 90.25
-Delta = 87.6 - 90.25 = -2.65
-
-Trend: DEGRADING (recent < historical)
-```
-
-Replace with your actual calculations from the commits you listed above.
-
-**Key Metrics**:
-- Commits analyzed: [number] (must match data sample above)
-- Current quality: [latest commit score from sample]
-- Critical issues: [count across all commits]
-- Security issues: [count]
-- Complexity issues: [count]
-
-**Issue Patterns** (with commit references):
-1. [Most common issue type]: [count] occurrences in commits: [SHA1, SHA2, ...]
-2. [Second most common]: [count] occurrences in commits: [SHA1, SHA2, ...]
-3. [Third most common]: [count] occurrences in commits: [SHA1, SHA2, ...]
-
-**Problematic Files** (with commit evidence):
-- [file path]: [issue count] in commits [SHA1, SHA2], quality: [score]
-- [file path]: [issue count] in commits [SHA1, SHA2], quality: [score]
-
-**Actionable Recommendations**:
-1. [Specific action with commit SHA/file/line reference from data above]
-2. [Specific action with commit SHA/file/line reference from data above]
-3. [Specific action with commit SHA/file/line reference from data above]
-
-CRITICAL REQUIREMENTS:
-1. You MUST list actual commit SHAs with their data (not placeholders)
-2. All numbers MUST be calculated from the commits you listed
-3. Show your calculation for trend (e.g., "(89.5 + 87.3 + 86.1) / 3 = 87.6")
-4. Every recommendation MUST cite a specific commit SHA from your data sample
-5. Do NOT invent data - extract it from RAG corpus only"""
+Use RAG corpus to get detailed information about specific issues, files, and code patterns."""
         
-        # Use RAG tool from shared setup (Gemini with RAG grounding)
+        # Use RAG tool for semantic details
         model = GenerativeModel(
             model_name="gemini-2.0-flash-001",
             tools=[rag_tool],
         )
         
-        # Generate response with RAG-grounded context
+        # Generate response with Firestore data + RAG grounding
         response = model.generate_content(prompt)
         ai_analysis = response.text if hasattr(response, 'text') else str(response)
         
@@ -443,10 +402,9 @@ CRITICAL REQUIREMENTS:
             "status": "success",
             "question": question,
             "repo": repo,
-            "commits_in_corpus": stats["commit_files"],
+            "commits_analyzed": len(commits),
             "analysis": ai_analysis,
-            "corpus_stats": stats,
-            "message": f"Analyzed {stats['commit_files']} commits from {repo}"
+            "message": f"Analyzed {len(commits)} commits from {repo}"
         }
         
     except Exception as e:
