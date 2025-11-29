@@ -107,22 +107,6 @@ SCENARIO 3: Pattern Statistics
 
 ---
 
-## 🔴 Deprecated/Broken Demos
-
-### `demo_context_caching.py`
-**Status:** ❌ Not working (syntax error + deprecated API)
-
-**Issues:**
-- Written for old API (not Vertex AI)
-- Uses non-existent `client.caches.create()`
-- Proof-of-concept, not integrated with current architecture
-
-**Recommendation:** Delete or rewrite for Vertex AI Context Caching API
-└── RAGCorpusManager → Vertex AI RAG storage
-```
-
----
-
 ## How to Add New Demo
 
 1. Create script `demo_*.py` in this folder
