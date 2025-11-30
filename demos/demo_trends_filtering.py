@@ -24,19 +24,20 @@ if env_file.exists():
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-# Setup logging
+# Setup logging BEFORE imports to suppress warnings
 logging.basicConfig(
     level=logging.WARNING,
     format="%(message)s"
 )
 
-# Suppress verbose warnings
+# Suppress verbose warnings (must be set before importing agents)
 # google.genai: response parts concatenation warnings (known behavior with tool calls)
 # google.adk: app name mismatch warnings (not critical for development)
 logging.getLogger("google_genai.types").setLevel(logging.ERROR)
 logging.getLogger("google.adk").setLevel(logging.ERROR)
 logging.getLogger("google.adk.runners").setLevel(logging.ERROR)
 
+# Now import agents
 from agents.query_trends.agent import root_agent as trends_agent
 from google.adk.runners import InMemoryRunner
 
@@ -109,7 +110,7 @@ async def demo_filtering():
         print(f"Query: {scenario['query']}\n")
         
         try:
-            response = await runner.run_agent(agent_input=scenario["query"])
+            response = await runner.run_debug(scenario["query"])
             print(response)
         except Exception as e:
             print(f"ERROR: {e}")
