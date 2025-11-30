@@ -25,10 +25,12 @@ logging.basicConfig(
     format="%(message)s"
 )
 
-# Suppress google.genai verbose warnings about response parts concatenation
-# This is a known behavior when agents make tool calls (function_call + text parts)
-# Following the pattern from main demo and e2e tests
+# Suppress verbose warnings
+# google.genai: response parts concatenation warnings (known behavior with tool calls)
+# google.adk: app name mismatch warnings (not critical for development)
 logging.getLogger("google_genai.types").setLevel(logging.ERROR)
+logging.getLogger("google.adk").setLevel(logging.ERROR)
+logging.getLogger("google.adk.runners").setLevel(logging.ERROR)
 
 from agents.query_trends.agent import root_agent as trends_agent
 from google.adk.runners import InMemoryRunner
@@ -71,8 +73,8 @@ async def demo_trends_agent():
     print("  12-13: IMPROVEMENT (removed eval, added auth)")
     print("  14-15: REGRESSION (rushed admin, disabled logging)\n")
     
-    # Create runner
-    runner = InMemoryRunner(agent=trends_agent, app_name="trends_agent_dev")
+    # Create runner (use consistent app_name across all demos)
+    runner = InMemoryRunner(agent=trends_agent, app_name="quality_guardian")
     
     # Test queries designed to show different patterns
     # Dates based on: initial commit 35 days ago, then commits every day starting 30 days ago

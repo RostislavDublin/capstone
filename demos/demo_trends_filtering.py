@@ -30,8 +30,12 @@ logging.basicConfig(
     format="%(message)s"
 )
 
-# Suppress google.genai verbose warnings
+# Suppress verbose warnings
+# google.genai: response parts concatenation warnings (known behavior with tool calls)
+# google.adk: app name mismatch warnings (not critical for development)
 logging.getLogger("google_genai.types").setLevel(logging.ERROR)
+logging.getLogger("google.adk").setLevel(logging.ERROR)
+logging.getLogger("google.adk.runners").setLevel(logging.ERROR)
 
 from agents.query_trends.agent import root_agent as trends_agent
 from google.adk.runners import InMemoryRunner
@@ -62,8 +66,8 @@ async def demo_filtering():
     print(f"Repository: {test_repo}")
     print("Testing: File filters, author filters, quality thresholds\n")
     
-    # Create runner
-    runner = InMemoryRunner(agent=trends_agent, app_name="trends_filtering_demo")
+    # Create runner (use consistent app_name across all demos)
+    runner = InMemoryRunner(agent=trends_agent, app_name="quality_guardian")
     
     # Test scenarios
     scenarios = [
