@@ -1,0 +1,5 @@
+"""query_orchestrator agent for ADK web."""
+
+from .agent import root_agent
+
+__all__ = ["root_agent"]

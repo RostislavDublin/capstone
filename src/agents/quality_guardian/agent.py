@@ -19,7 +19,7 @@ from google.genai import types
 # Import sub-agents from sibling directories
 from agents.bootstrap.agent import root_agent as bootstrap_agent
 from agents.sync.agent import root_agent as sync_agent
-from agents.query.agent import root_agent as query_agent
+from agents.query_orchestrator.agent import root_agent as query_agent  # NEW: orchestrator
 
 logger = logging.getLogger(__name__)
 
