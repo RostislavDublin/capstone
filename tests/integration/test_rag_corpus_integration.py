@@ -11,13 +11,154 @@ Run with: pytest tests/integration/test_rag_corpus_integration.py -v -s
 
 import os
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 
 import pytest
 import vertexai
 
-from src.audit_models import CommitAudit, RepositoryAudit
+from src.audit_models import CommitAudit
 from src.storage.rag_corpus import RAGCorpusManager
+
+
+@contextmanager
+def timer(operation_name: str):
+    """Context manager to time operations and print results."""
+    start = time.time()
+    print(f"   ⏱️  Starting: {operation_name}")
+    try:
+        yield
+    finally:
+        elapsed = time.time() - start
+        print(f"   ⏱️  Finished: {operation_name} ({elapsed:.2f}s)")
+        if elapsed > 10:
+            print(f"      ⚠️  SLOW: {operation_name} took {elapsed:.2f}s")
+
+
+def wait_for_indexing(corpus_name: str, file_name: str, max_attempts=4, base_delay=0.5):
+    """Wait for RAG file indexing with exponential backoff and status verification.
+    
+    Checks if file is indexed by listing files and checking state (PENDING -> READY).
+    This is the recommended approach from Vertex AI RAG documentation.
+    Exponential backoff: 0.5s, 1s, 2s, 4s (max 7.5s, usually exits at ~1-2s).
+    
+    Args:
+        corpus_name: RAG corpus resource name
+        file_name: RAG file resource name (used to identify the specific file)
+        max_attempts: Maximum attempts (default: 4)
+        base_delay: Base delay in seconds (default: 0.5s)
+        
+    Returns:
+        Total time waited in seconds
+    """
+    from vertexai import rag
+    
+    start_time = time.time()
+    
+    for attempt in range(max_attempts):
+        delay = base_delay * (2 ** attempt)
+        print(f"   ⏳ Wait {attempt + 1}/{max_attempts} ({delay:.1f}s)...")
+        time.sleep(delay)
+        
+        # List files and find our file to check status
+        try:
+            files = list(rag.list_files(corpus_name=corpus_name))
+            for file in files:
+                if file.name == file_name:
+                    # Check file_status.state (standard field in gapic types)
+                    if hasattr(file, 'file_status') and hasattr(file.file_status, 'state'):
+                        from google.cloud.aiplatform_v1.types.vertex_rag_data import FileStatus
+                        
+                        state_value = file.file_status.state
+                        if state_value == FileStatus.State.ACTIVE:
+                            elapsed = time.time() - start_time
+                            print(f"   ✅ Indexed! ({elapsed:.2f}s)")
+                            return elapsed
+                        elif state_value == FileStatus.State.ERROR:
+                            print(f"   ❌ ERROR: {file.file_status.error_status}")
+                            elapsed = time.time() - start_time
+                            return elapsed  # Exit on error
+                        else:
+                            state_names = {0: "STATE_UNSPECIFIED", 1: "ACTIVE", 2: "ERROR"}
+                            state_name = state_names.get(state_value, f"UNKNOWN({state_value})")
+                            print(f"   ⏱️  Status: {state_name}")
+                    else:
+                        # No file_status field - shouldn't happen with current SDK
+                        print(f"   ⚠️  No file_status field, cannot verify")
+                    break
+            else:
+                print(f"   ⚠️  File not found in list")
+        except Exception as e:
+            print(f"   ⚠️  Error checking status: {e}")
+            continue
+    
+    # Max attempts reached
+    elapsed = time.time() - start_time
+    print(f"   ⚠️  Max wait ({elapsed:.2f}s)")
+    return elapsed
+
+
+def wait_for_all_files_indexed(corpus_name: str, max_attempts=6, base_delay=0.5):
+    """Wait for all files in corpus to be indexed with exponential backoff.
+    
+    Checks if ALL files are indexed by listing files and checking status.
+    This is approach #2 from Vertex AI RAG documentation for multiple files.
+    Exponential backoff: 0.5s, 1s, 2s, 4s, 8s, 16s (max 31.5s, usually exits at ~2-4s).
+    
+    Args:
+        corpus_name: RAG corpus resource name
+        max_attempts: Maximum attempts (default: 6)
+        base_delay: Base delay in seconds (default: 0.5s)
+        
+    Returns:
+        Total time waited in seconds
+    """
+    from vertexai import rag
+    
+    start_time = time.time()
+    
+    for attempt in range(max_attempts):
+        delay = base_delay * (2 ** attempt)
+        print(f"   ⏳ Wait {attempt + 1}/{max_attempts} ({delay:.1f}s)...")
+        time.sleep(delay)
+        
+        # Check all files status
+        try:
+            from google.cloud.aiplatform_v1.types.vertex_rag_data import FileStatus
+            
+            files = list(rag.list_files(corpus_name=corpus_name))
+            if not files:
+                print(f"   ⚠️  No files found yet")
+                continue
+            
+            # Check if all ACTIVE (ready)
+            ready_count = 0
+            error_count = 0
+            for f in files:
+                if hasattr(f, 'file_status') and hasattr(f.file_status, 'state'):
+                    if f.file_status.state == FileStatus.State.ACTIVE:
+                        ready_count += 1
+                    elif f.file_status.state == FileStatus.State.ERROR:
+                        error_count += 1
+            
+            total_count = len(files)
+            
+            if ready_count == total_count:
+                elapsed = time.time() - start_time
+                print(f"   ✅ All {total_count} files indexed! ({elapsed:.2f}s)")
+                return elapsed
+            elif error_count > 0:
+                print(f"   ⚠️  {error_count} file(s) have errors, {ready_count}/{total_count} ready")
+            else:
+                print(f"   ⏱️  {ready_count}/{total_count} files ready")
+        except Exception as e:
+            print(f"   ⚠️  Error checking status: {e}")
+            continue
+    
+    # Max attempts reached
+    elapsed = time.time() - start_time
+    print(f"   ⚠️  Max wait ({elapsed:.2f}s)")
+    return elapsed
 
 
 # Skip if environment not configured
@@ -105,32 +246,6 @@ def sample_commit_audit():
     )
 
 
-@pytest.fixture
-def sample_repository_audit():
-    """Sample RepositoryAudit for integration testing."""
-    return RepositoryAudit(
-        repo_identifier="test/integration-repo",
-        repo_name="integration-repo",
-        default_branch="main",
-        audit_id="integration-audit-001",
-        audit_date=datetime(2025, 11, 21, 12, 0, 0, tzinfo=timezone.utc),
-        scan_type="bootstrap_full",
-        commits_scanned=5,
-        date_range_start=datetime(2025, 11, 1, tzinfo=timezone.utc),
-        date_range_end=datetime(2025, 11, 21, tzinfo=timezone.utc),
-        commit_audits=[],
-        total_issues=8,
-        critical_issues=0,
-        high_issues=1,
-        medium_issues=3,
-        low_issues=4,
-        issues_by_type={"security": 2, "complexity": 4, "style": 2},
-        avg_quality_score=88.5,
-        quality_trend="improving",
-        processing_time=12.5,
-    )
-
-
 # ============================================================================
 # Integration Tests - Real Vertex AI API Calls
 # ============================================================================
@@ -188,12 +303,14 @@ def test_store_commit_audit_real(rag_manager, sample_commit_audit, vertexai_init
     
     # Initialize corpus
     print("\n1️⃣  Initializing corpus...")
-    corpus = rag_manager.initialize_corpus()
+    with timer("Initialize corpus"):
+        corpus = rag_manager.initialize_corpus()
     print(f"✅ Corpus ready: {corpus.name}")
     
     # Store commit audit
     print("\n2️⃣  Uploading commit audit...")
-    result = rag_manager.store_commit_audit(sample_commit_audit, store_files_separately=False)
+    with timer("Upload commit audit"):
+        result = rag_manager.store_commit_audit(sample_commit_audit, store_files_separately=False)
 
     assert result is not None
     assert 'commit' in result
@@ -201,45 +318,13 @@ def test_store_commit_audit_real(rag_manager, sample_commit_audit, vertexai_init
     print(f"✅ Commit audit stored: {result['commit'].name}")
     print(f"   Display name: {result['commit'].display_name}")
     
-    # Wait for indexing
-    print("\n⏳ Waiting for indexing (5 seconds)...")
-    time.sleep(5)
-    print("✅ Indexing should be complete")
+    # Wait for indexing with smart retry
+    print("\n⏳ Waiting for indexing...")
+    with timer("Indexing wait"):
+        wait_for_indexing(rag_manager._corpus_resource_name, result['commit'].name)
 
 
-def test_store_repository_audit_real(rag_manager, sample_repository_audit, vertexai_init):
-    """Test storing RepositoryAudit with real Vertex AI upload.
-    
-    This tests:
-    - JSON serialization of RepositoryAudit
-    - Upload of larger document
-    - Metadata handling
-    """
-    print("\n" + "="*70)
-    print("TEST: Store Repository Audit")
-    print("="*70)
-    
-    # Initialize corpus
-    print("\n1️⃣  Initializing corpus...")
-    corpus = rag_manager.initialize_corpus()
-    print(f"✅ Corpus ready: {corpus.name}")
-    
-    # Store repository audit
-    print("\n2️⃣  Uploading repository audit...")
-    rag_file = rag_manager.store_repository_audit(sample_repository_audit)
-    
-    assert rag_file is not None
-    assert rag_file.display_name == "repo_integration-repo.json"
-    print(f"✅ Repository audit stored: {rag_file.name}")
-    print(f"   Display name: {rag_file.display_name}")
-    
-    # Wait for indexing
-    print("\n⏳ Waiting for indexing (5 seconds)...")
-    time.sleep(5)
-    print("✅ Indexing should be complete")
-
-
-def test_query_audits_real(rag_manager, sample_commit_audit, sample_repository_audit, vertexai_init):
+def test_query_audits_real(rag_manager, sample_commit_audit, vertexai_init):
     """Test semantic search queries with real Vertex AI retrieval.
     
     This tests:
@@ -258,14 +343,12 @@ def test_query_audits_real(rag_manager, sample_commit_audit, sample_repository_a
     print("   Uploading commit audit...")
     rag_manager.store_commit_audit(sample_commit_audit)
     
-    print("   Uploading repository audit...")
-    rag_manager.store_repository_audit(sample_repository_audit)
-    
     print("✅ Test data uploaded")
     
-    # Wait for indexing
-    print("\n⏳ Waiting for indexing (10 seconds)...")
-    time.sleep(10)
+    # Wait for indexing with smart retry (multiple files)
+    print("\n⏳ Waiting for indexing...")
+    with timer("Indexing wait"):
+        wait_for_all_files_indexed(rag_manager._corpus_resource_name, max_attempts=6)
     
     # Query 1: Security issues
     print("\n2️⃣  Query 1: Security issues...")
@@ -298,43 +381,6 @@ def test_query_audits_real(rag_manager, sample_commit_audit, sample_repository_a
     
     print(f"✅ Query returned {len(results3)} results (threshold filtered)")
     assert isinstance(results3, list)
-
-
-def test_get_latest_audit_real(rag_manager, sample_commit_audit, vertexai_init):
-    """Test getting latest audit with real Vertex AI query.
-    
-    This tests:
-    - Upload audit
-    - Query for latest
-    - Result filtering
-    """
-    print("\n" + "="*70)
-    print("TEST: Get Latest Audit")
-    print("="*70)
-    
-    # Setup
-    print("\n1️⃣  Setting up test data...")
-    corpus = rag_manager.initialize_corpus()
-    rag_manager.store_commit_audit(sample_commit_audit)
-    print("✅ Commit audit uploaded")
-    
-    # Wait for indexing
-    print("\n⏳ Waiting for indexing (10 seconds)...")
-    time.sleep(10)
-    
-    # Get latest
-    print("\n2️⃣  Querying for latest audit...")
-    result = rag_manager.get_latest_audit("test/integration-repo", audit_type="commit")
-    
-    if result:
-        print(f"✅ Found latest audit")
-        print(f"   Text preview: {result.get('text', '')[:100]}...")
-        assert "text" in result
-    else:
-        print("⚠️  No results (indexing may not be complete)")
-    
-    # Note: May return None if indexing incomplete
-    assert result is None or isinstance(result, dict)
 
 
 def test_error_handling_uninit(rag_manager):
@@ -371,88 +417,3 @@ def test_error_handling_uninit(rag_manager):
     with pytest.raises(RuntimeError, match="Corpus not initialized"):
         rag_manager.query_audits("test")
     print("✅ Correct error raised")
-    
-    # Try to get latest without init
-    print("\n3️⃣  Attempting get_latest without init...")
-    with pytest.raises(RuntimeError, match="Corpus not initialized"):
-        rag_manager.get_latest_audit("test/repo")
-    print("✅ Correct error raised")
-
-
-# ============================================================================
-# Summary Test - Full Workflow
-# ============================================================================
-
-
-def test_full_workflow_integration(rag_manager, sample_commit_audit, sample_repository_audit, vertexai_init):
-    """Complete end-to-end workflow test.
-    
-    This simulates the actual Quality Guardian workflow:
-    1. Bootstrap: Create corpus
-    2. Audit: Upload commit audits
-    3. Aggregate: Upload repository audit
-    4. Query: Search for insights
-    5. Cleanup: Delete corpus
-    """
-    print("\n" + "="*70)
-    print("TEST: Full Workflow Integration")
-    print("="*70)
-    
-    # Step 1: Initialize (Bootstrap phase)
-    print("\n🔵 PHASE 1: Bootstrap")
-    print("─" * 70)
-    corpus = rag_manager.initialize_corpus()
-    print(f"✅ Corpus created: {corpus.display_name}")
-    
-    # Step 2: Store multiple audits (Audit phase)
-    print("\n🔵 PHASE 2: Audit Collection")
-    print("─" * 70)
-    
-    print("   Storing commit audit 1...")
-    result1 = rag_manager.store_commit_audit(sample_commit_audit, store_files_separately=False)
-    print(f"   ✅ Stored: {result1['commit'].display_name}")
-    
-    print("   Storing commit audit 2 (modified)...")
-    sample_commit_audit.commit_sha = "integration-test-sha-67890"
-    sample_commit_audit.quality_score = 85.0
-    result2 = rag_manager.store_commit_audit(sample_commit_audit, store_files_separately=False)
-    print(f"   ✅ Stored: {result2['commit'].display_name}")
-    
-    print("   Storing repository audit...")
-    rag_file3 = rag_manager.store_repository_audit(sample_repository_audit)
-    print(f"   ✅ Stored: {rag_file3.display_name}")
-    
-    # Step 3: Wait for indexing
-    print("\n⏳ Waiting for indexing (15 seconds)...")
-    time.sleep(15)
-    
-    # Step 4: Query insights (Query phase)
-    print("\n🔵 PHASE 3: Query & Analysis")
-    print("─" * 70)
-    
-    queries = [
-        "What security issues were found?",
-        "Show quality trends",
-        "Integration test results",
-    ]
-    
-    for i, query in enumerate(queries, 1):
-        print(f"\n   Query {i}: {query}")
-        results = rag_manager.query_audits(query, top_k=3)
-        print(f"   ✅ Returned {len(results)} results")
-        
-        for j, result in enumerate(results, 1):
-            preview = result['text'][:80].replace('\n', ' ')
-            print(f"      {j}. {preview}...")
-    
-    # Step 5: Validate
-    print("\n🔵 PHASE 4: Validation")
-    print("─" * 70)
-    print("✅ Corpus lifecycle: OK")
-    print("✅ Upload operations: OK")
-    print("✅ Query operations: OK")
-    print("✅ Error handling: OK")
-    
-    print("\n" + "="*70)
-    print("🎉 FULL WORKFLOW INTEGRATION TEST PASSED")
-    print("="*70)

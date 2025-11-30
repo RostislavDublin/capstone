@@ -362,22 +362,26 @@ The application uses a service account for authentication with GCP services. You
    
    The service account needs these roles to function properly:
    
-   - **Cloud Run Admin** (`roles/run.admin`)
-     - Reason: For deploying agents to Cloud Run (if using Cloud Run deployment)
+   - **Vertex AI User** (`roles/aiplatform.user`) - **REQUIRED**
+     - Reason: Access Gemini models and Vertex AI RAG Engine APIs
+     - **Critical:** Without this role, RAG file uploads will fail with `invalid_scope` OAuth error
    
-   - **Cloud Datastore User** (`roles/datastore.user`)
+   - **Cloud Datastore User** (`roles/datastore.user`) - **REQUIRED**
      - Reason: Read/write access to Firestore for audit data storage
    
-   - **Service Account User** (`roles/iam.serviceAccountUser`)
-     - Reason: Required to run services as this service account
+   - **Cloud Run Admin** (`roles/run.admin`) - Optional
+     - Reason: For deploying agents to Cloud Run (if using Cloud Run deployment)
    
-   - **Storage Admin** (`roles/storage.admin`)
-     - Reason: Manage Cloud Storage buckets for RAG corpus data
+   - **Service Account User** (`roles/iam.serviceAccountUser`) - Optional
+     - Reason: Required to run services as this service account (for Cloud Run)
    
-   - **Vertex AI User** (`roles/aiplatform.user`)
-     - Reason: Access Gemini models and RAG APIs
+   - **Storage Admin** (`roles/storage.admin`) - Optional
+     - Reason: Manage Cloud Storage buckets (may be needed for some RAG operations)
    
    Add each role by clicking **+ ADD ANOTHER ROLE** and searching for the role name.
+   
+   **Important:** The `Vertex AI User` role is essential for RAG Engine operations. Without it, 
+   you'll encounter OAuth scope errors during file uploads to RAG corpus.
    
    Click **CONTINUE** → **DONE**
 

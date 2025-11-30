@@ -7,9 +7,9 @@ from typing import Any, Dict
 from unittest.mock import MagicMock, Mock, call, patch
 
 import pytest
-from vertexai.preview import rag
+from vertexai import rag
 
-from src.audit_models import CommitAudit, RepositoryAudit
+from src.audit_models import CommitAudit
 from src.storage.rag_corpus import RAGCorpusManager
 
 
@@ -80,32 +80,6 @@ def sample_commit_audit():
         medium_issues=1,
         low_issues=0,
         quality_score=75.0,
-    )
-
-
-@pytest.fixture
-def sample_repository_audit():
-    """Sample RepositoryAudit for testing."""
-    return RepositoryAudit(
-        repo_identifier="acme/web-app",
-        repo_name="web-app",
-        default_branch="main",
-        audit_id="audit-123",
-        audit_date=datetime(2025, 11, 21, 10, 0, 0, tzinfo=timezone.utc),
-        scan_type="bootstrap_full",
-        commits_scanned=10,
-        date_range_start=datetime(2025, 11, 1, tzinfo=timezone.utc),
-        date_range_end=datetime(2025, 11, 21, tzinfo=timezone.utc),
-        commit_audits=[],
-        total_issues=15,
-        critical_issues=0,
-        high_issues=2,
-        medium_issues=5,
-        low_issues=8,
-        issues_by_type={"security": 2, "complexity": 5, "style": 8},
-        avg_quality_score=82.0,
-        quality_trend="stable",
-        processing_time=45.2,
     )
 
 
@@ -222,11 +196,11 @@ def test_initialize_corpus_create_failure(
 # ============================================================================
 
 
-@patch("src.storage.rag_corpus.rag.upload_file")
+@patch("src.storage.rag_corpus.RAGCorpusManager._upload_with_scoped_credentials")
 @patch("src.storage.rag_corpus.Path")
 def test_store_commit_audit_success(
     mock_path,
-    mock_upload_file,
+    mock_upload_method,
     mock_vertexai,
     rag_manager,
     sample_commit_audit,
@@ -236,7 +210,7 @@ def test_store_commit_audit_success(
     """Test store_commit_audit successfully uploads audit."""
     rag_manager._corpus = mock_rag_corpus
     rag_manager._corpus_resource_name = mock_rag_corpus.name
-    mock_upload_file.return_value = mock_rag_file
+    mock_upload_method.return_value = mock_rag_file
 
     # Mock temp file cleanup
     mock_path_instance = MagicMock()
@@ -246,18 +220,18 @@ def test_store_commit_audit_success(
     result = rag_manager.store_commit_audit(sample_commit_audit, store_files_separately=False)
 
     assert result['commit'] == mock_rag_file
-    mock_upload_file.assert_called_once()
+    mock_upload_method.assert_called_once()
 
     # Check call arguments
-    call_args = mock_upload_file.call_args
+    call_args = mock_upload_method.call_args
     assert call_args.kwargs["corpus_name"] == mock_rag_corpus.name
     assert call_args.kwargs["display_name"] == "commit_abc1234.json"
     assert "Commit audit:" in call_args.kwargs["description"]
 
 
-@patch("src.storage.rag_corpus.rag.upload_file")
+@patch("src.storage.rag_corpus.RAGCorpusManager._upload_with_scoped_credentials")
 def test_store_commit_audit_custom_display_name(
-    mock_upload_file,
+    mock_upload_method,
     mock_vertexai,
     rag_manager,
     sample_commit_audit,
@@ -267,14 +241,14 @@ def test_store_commit_audit_custom_display_name(
     """Test store_commit_audit with custom display name."""
     rag_manager._corpus = mock_rag_corpus
     rag_manager._corpus_resource_name = mock_rag_corpus.name
-    mock_upload_file.return_value = mock_rag_file
+    mock_upload_method.return_value = mock_rag_file
 
     result = rag_manager.store_commit_audit(
         sample_commit_audit, display_name="custom_name.json", store_files_separately=False
     )
 
     assert result['commit'] == mock_rag_file
-    call_args = mock_upload_file.call_args
+    call_args = mock_upload_method.call_args
     assert call_args.kwargs["display_name"] == "custom_name.json"
 
 
@@ -299,53 +273,6 @@ def test_store_commit_audit_upload_failure(
 
     with pytest.raises(RuntimeError, match="Failed to upload file"):
         rag_manager.store_commit_audit(sample_commit_audit)
-
-
-# ============================================================================
-# Test: Store Repository Audit
-# ============================================================================
-
-
-@patch("src.storage.rag_corpus.rag.upload_file")
-@patch("src.storage.rag_corpus.Path")
-def test_store_repository_audit_success(
-    mock_path,
-    mock_upload_file,
-    mock_vertexai,
-    rag_manager,
-    sample_repository_audit,
-    mock_rag_corpus,
-    mock_rag_file,
-):
-    """Test store_repository_audit successfully uploads audit."""
-    rag_manager._corpus = mock_rag_corpus
-    rag_manager._corpus_resource_name = mock_rag_corpus.name
-    mock_upload_file.return_value = mock_rag_file
-
-    # Mock temp file cleanup
-    mock_path_instance = MagicMock()
-    mock_path.return_value = mock_path_instance
-    mock_path_instance.exists.return_value = True
-
-    result = rag_manager.store_repository_audit(sample_repository_audit)
-
-    assert result == mock_rag_file
-    mock_upload_file.assert_called_once()
-
-    # Check call arguments
-    call_args = mock_upload_file.call_args
-    assert call_args.kwargs["corpus_name"] == mock_rag_corpus.name
-    assert call_args.kwargs["display_name"] == "repo_web-app.json"
-    assert "Repository audit:" in call_args.kwargs["description"]
-    assert "10 commits" in call_args.kwargs["description"]
-
-
-def test_store_repository_audit_without_init(
-    mock_vertexai, rag_manager, sample_repository_audit
-):
-    """Test store_repository_audit raises error if corpus not initialized."""
-    with pytest.raises(RuntimeError, match="Corpus not initialized"):
-        rag_manager.store_repository_audit(sample_repository_audit)
 
 
 # ============================================================================
@@ -390,7 +317,7 @@ def test_query_audits_success(
     mock_retrieval_query.assert_called_once()
     call_args = mock_retrieval_query.call_args
     assert call_args.kwargs["text"] == "Show security issues"
-    assert call_args.kwargs["similarity_top_k"] == 5
+    assert call_args.kwargs["rag_retrieval_config"].top_k == 5
 
 
 @patch("src.storage.rag_corpus.rag.retrieval_query")
@@ -410,7 +337,9 @@ def test_query_audits_with_threshold(
     rag_manager.query_audits("test query", vector_distance_threshold=0.8)
 
     call_args = mock_retrieval_query.call_args
-    assert abs(call_args.kwargs["vector_distance_threshold"] - 0.8) < 0.01
+    config = call_args.kwargs["rag_retrieval_config"]
+    assert config.filter is not None
+    assert abs(config.filter.vector_distance_threshold - 0.8) < 0.01
 
 
 def test_query_audits_without_init(mock_vertexai, rag_manager):
@@ -447,67 +376,6 @@ def test_query_audits_failure(
 
     with pytest.raises(RuntimeError, match="Query failed"):
         rag_manager.query_audits("test query")
-
-
-# ============================================================================
-# Test: Get Latest Audit
-# ============================================================================
-
-
-@patch("src.storage.rag_corpus.rag.retrieval_query")
-def test_get_latest_audit_found(
-    mock_retrieval_query, mock_vertexai, rag_manager, mock_rag_corpus
-):
-    """Test get_latest_audit returns latest audit."""
-    rag_manager._corpus = mock_rag_corpus
-    rag_manager._corpus_resource_name = mock_rag_corpus.name
-
-    # Mock text must contain commit_sha and date in parseable format
-    mock_context = Mock()
-    mock_context.text = '''
-    {
-        "commit_sha": "abc1234567890def",
-        "date": "2024-01-15T10:30:00Z",
-        "message": "Test commit"
-    }
-    '''
-    mock_context.distance = 0.95
-
-    mock_contexts = Mock()
-    mock_contexts.contexts = [mock_context]
-
-    mock_response = Mock()
-    mock_response.contexts = mock_contexts
-    mock_retrieval_query.return_value = mock_response
-
-    result = rag_manager.get_latest_audit("acme/web-app", audit_type="commit")
-
-    assert result is not None
-    assert result["commit_sha"] == "abc1234567890def"
-    assert "2024-01-15" in result["date"]
-
-
-@patch("src.storage.rag_corpus.rag.retrieval_query")
-def test_get_latest_audit_not_found(
-    mock_retrieval_query, mock_vertexai, rag_manager, mock_rag_corpus
-):
-    """Test get_latest_audit returns None when no audit found."""
-    rag_manager._corpus = mock_rag_corpus
-    rag_manager._corpus_resource_name = mock_rag_corpus.name
-
-    mock_response = Mock()
-    mock_response.contexts = None
-    mock_retrieval_query.return_value = mock_response
-
-    result = rag_manager.get_latest_audit("acme/web-app")
-
-    assert result is None
-
-
-def test_get_latest_audit_without_init(mock_vertexai, rag_manager):
-    """Test get_latest_audit raises error if corpus not initialized."""
-    with pytest.raises(RuntimeError, match="Corpus not initialized"):
-        rag_manager.get_latest_audit("acme/web-app")
 
 
 # ============================================================================
@@ -556,11 +424,11 @@ def test_delete_corpus_failure(
 # ============================================================================
 
 
-@patch("src.storage.rag_corpus.rag.upload_file")
+@patch("src.storage.rag_corpus.RAGCorpusManager._upload_with_scoped_credentials")
 @patch("src.storage.rag_corpus.Path")
 def test_temp_file_cleanup_on_success(
     mock_path,
-    mock_upload_file,
+    mock_upload_method,
     mock_vertexai,
     rag_manager,
     sample_commit_audit,
@@ -570,7 +438,7 @@ def test_temp_file_cleanup_on_success(
     """Test temporary file is cleaned up after successful upload."""
     rag_manager._corpus = mock_rag_corpus
     rag_manager._corpus_resource_name = mock_rag_corpus.name
-    mock_upload_file.return_value = mock_rag_file
+    mock_upload_method.return_value = mock_rag_file
 
     mock_path_instance = MagicMock()
     mock_path.return_value = mock_path_instance

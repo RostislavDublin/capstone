@@ -1,19 +1,23 @@
 """RAG Corpus Storage Manager for Quality Guardian audits.
 
-Uses Vertex AI RAG Corpus (vertexai.preview.rag) for persistent storage
+Uses Vertex AI RAG Corpus (vertexai.rag) for persistent storage
 with semantic search capabilities. Compatible with Vertex AI service account auth.
 """
 
 import json
 import logging
+import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import vertexai
-from vertexai.preview import rag
+from vertexai import rag
+from google.oauth2 import service_account
+from google.auth.transport import requests as google_auth_requests
 
-from audit_models import CommitAudit, RepositoryAudit
+from audit_models import CommitAudit
 
 logger = logging.getLogger(__name__)
 
@@ -142,13 +146,17 @@ class RAGCorpusManager:
             logger.warning(f"Could not check for existing files: {e}")
 
         # 1. Store commit-level document (as before)
+        t0 = time.time()
         audit_json = audit.model_dump_json(indent=2)
+        logger.debug(f"JSON serialization: {time.time() - t0:.3f}s")
 
+        t0 = time.time()
         commit_file = self._upload_json(
             json_content=audit_json,
             display_name=display_name,
             description=f"Commit audit: {audit.commit_sha[:7]} by {audit.author}",
         )
+        logger.info(f"Upload commit audit: {time.time() - t0:.3f}s")
         uploaded_files['commit'] = commit_file
 
         # 2. Store per-file documents (NEW!)
@@ -187,41 +195,6 @@ class RAGCorpusManager:
 
         return uploaded_files
 
-    def store_repository_audit(
-        self,
-        audit: RepositoryAudit,
-        display_name: Optional[str] = None,
-    ) -> rag.RagFile:
-        """Store RepositoryAudit in RAG Corpus.
-        
-        Args:
-            audit: RepositoryAudit instance to store
-            display_name: Optional display name (default: repo_{repo_name}.json)
-            
-        Returns:
-            RagFile instance
-            
-        Raises:
-            RuntimeError: If corpus not initialized or upload fails
-        """
-        if self._corpus_resource_name is None:
-            raise RuntimeError("Corpus not initialized. Call initialize_corpus() first.")
-
-        # Serialize audit to JSON
-        audit_json = audit.model_dump_json(indent=2)
-
-        # Generate display name
-        if display_name is None:
-            repo_name = audit.repo_identifier.split("/")[-1]
-            display_name = f"repo_{repo_name}.json"
-
-        # Upload via temp file
-        return self._upload_json(
-            json_content=audit_json,
-            display_name=display_name,
-            description=f"Repository audit: {audit.repo_identifier} ({audit.commits_scanned} commits)",
-        )
-
     def query_audits(
         self,
         query_text: str,
@@ -245,11 +218,18 @@ class RAGCorpusManager:
             raise RuntimeError("Corpus not initialized. Call initialize_corpus() first.")
 
         try:
+            # Build retrieval config
+            retrieval_config = rag.RagRetrievalConfig(
+                top_k=top_k,
+                filter=rag.Filter(
+                    vector_distance_threshold=vector_distance_threshold
+                ) if vector_distance_threshold else None,
+            )
+            
             response = rag.retrieval_query(
                 text=query_text,
                 rag_resources=[rag.RagResource(rag_corpus=self._corpus_resource_name)],
-                similarity_top_k=top_k,
-                vector_distance_threshold=vector_distance_threshold,
+                rag_retrieval_config=retrieval_config,
             )
 
             # Extract contexts
@@ -267,103 +247,6 @@ class RAGCorpusManager:
 
         except Exception as e:
             raise RuntimeError(f"Query failed: {e}") from e
-
-    def get_latest_audit(
-        self,
-        repository: str,
-        audit_type: str = "commit",
-    ) -> Optional[Dict]:
-        """Get most recent audit for a repository using RAG semantic search.
-        
-        This method asks RAG a natural language question and lets it find
-        the answer from stored commit audits based on document content (dates, SHAs).
-        
-        Args:
-            repository: Repository name (e.g., "acme/web-app")
-            audit_type: Type of audit ("commit" or "repository")
-            
-        Returns:
-            Dict with commit_sha and date, or None if not found
-        """
-        if self._corpus_resource_name is None:
-            raise RuntimeError("Corpus not initialized. Call initialize_corpus() first.")
-
-        try:
-            # Ask RAG to find commits for this repository
-            # It will search through commit audit JSONs and find matching ones
-            query = f"Show me commit audits for repository {repository}. I need the most recent commit SHA and date."
-            
-            results = self.query_audits(query, top_k=10)
-            
-            logger.debug(f"RAG query returned {len(results) if results else 0} results for {repository}")
-            
-            if not results:
-                logger.debug(f"No results from RAG for repository {repository}")
-                return None
-            
-            # Parse results to extract commit info
-            # Results contain text chunks from commit audit JSONs
-            import json
-            import re
-            
-            commits = []
-            seen_shas = set()  # Avoid duplicates (same commit in multiple chunks)
-            
-            for i, result in enumerate(results):
-                text = result.get("text", "")
-                
-                # RAG returns text chunks, not full JSONs - parse with regex
-                # Look for patterns like: "commit_sha": "abc123..." or commit_sha abc123...
-                sha_patterns = [
-                    r'"commit_sha":\s*"([a-f0-9]{7,40})"',  # JSON format
-                    r'commit_sha[:\s]+([a-f0-9]{7,40})',     # Text format
-                ]
-                date_patterns = [
-                    r'"date":\s*"([^"]+)"',                  # JSON format
-                    r'date[:\s]+"?([0-9]{4}-[0-9]{2}-[0-9]{2}[T\s][^"\n]+)',  # Text format
-                ]
-                
-                sha_match = None
-                for pattern in sha_patterns:
-                    sha_match = re.search(pattern, text)
-                    if sha_match:
-                        break
-                
-                date_match = None
-                for pattern in date_patterns:
-                    date_match = re.search(pattern, text)
-                    if date_match:
-                        break
-                
-                if sha_match and date_match:
-                    sha = sha_match.group(1)
-                    if sha not in seen_shas:
-                        commits.append({
-                            "commit_sha": sha,
-                            "date": date_match.group(1).strip('"'),
-                        })
-                        seen_shas.add(sha)
-                        logger.debug(f"Parsed commit from chunk {i}: {sha[:8]}")
-                    else:
-                        logger.debug(f"Chunk {i} has no complete commit info")
-            
-            logger.debug(f"Successfully parsed {len(commits)} commits from RAG results")
-            
-            if not commits:
-                logger.debug("No commits could be parsed from RAG results")
-                return None            # Sort by date (most recent first)
-            from datetime import datetime
-            commits_sorted = sorted(
-                commits,
-                key=lambda c: datetime.fromisoformat(c["date"].replace("Z", "+00:00")),
-                reverse=True
-            )
-            
-            return commits_sorted[0]
-            
-        except Exception as e:
-            logger.error(f"Failed to get latest audit: {e}")
-            return None
 
     def clear_all_files(self) -> int:
         """Delete all files from corpus without deleting the corpus itself.
@@ -457,9 +340,9 @@ class RAGCorpusManager:
                 )
             )
 
-            # Upload to RAG Corpus
+            # Upload to RAG Corpus with proper OAuth scopes
             logger.info(f"Uploading {display_name} to corpus")
-            rag_file = rag.upload_file(
+            rag_file = self._upload_with_scoped_credentials(
                 corpus_name=self._corpus_resource_name,
                 path=temp_file,
                 display_name=display_name,
@@ -481,6 +364,117 @@ class RAGCorpusManager:
                     logger.debug(f"Cleaned up temp file: {temp_file}")
                 except Exception as e:
                     logger.warning(f"Failed to delete temp file {temp_file}: {e}")
+
+    def _upload_with_scoped_credentials(
+        self,
+        corpus_name: str,
+        path: str,
+        display_name: str,
+        description: str,
+        transformation_config: rag.TransformationConfig,
+    ) -> rag.RagFile:
+        """Upload file with properly scoped service account credentials.
+        
+        Workaround for https://stackoverflow.com/questions/79667247
+        The vertexai.rag.upload_file() uses google.auth.default() which doesn't
+        add required scopes for service accounts, causing 'invalid_scope' error.
+        
+        Args:
+            corpus_name: RAG corpus resource name
+            path: Local file path to upload
+            display_name: Display name for the file
+            description: File description
+            transformation_config: Chunking configuration
+            
+        Returns:
+            RagFile instance
+            
+        Raises:
+            RuntimeError: If upload fails
+        """
+        import google.auth
+        from google import auth
+        from google.cloud import aiplatform
+        from google.cloud.aiplatform import initializer
+        from google.cloud.aiplatform import utils
+        
+        # Get credentials with proper scopes
+        t0 = time.time()
+        credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+        if credentials_path and os.path.exists(credentials_path):
+            # Load service account with explicit scopes
+            credentials = service_account.Credentials.from_service_account_file(
+                credentials_path,
+                scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            )
+        else:
+            # Fallback to default (may still fail)
+            credentials, _ = google.auth.default(
+                scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            )
+        logger.debug(f"  → Load credentials: {time.time() - t0:.3f}s")
+        
+        # Build upload request (same as vertexai.rag.upload_file internals)
+        t0 = time.time()
+        location = initializer.global_config.location
+        if not initializer.global_config.api_endpoint:
+            request_endpoint = f"{location}-{aiplatform.constants.base.API_BASE_PATH}"
+        else:
+            request_endpoint = initializer.global_config.api_endpoint
+            
+        upload_request_uri = f"https://{request_endpoint}/upload/v1/{corpus_name}/ragFiles:upload"
+        
+        # Prepare metadata
+        js_rag_file = {"rag_file": {"display_name": display_name}}
+        if description:
+            js_rag_file["rag_file"]["description"] = description
+            
+        if transformation_config and transformation_config.chunking_config:
+            chunk_size = transformation_config.chunking_config.chunk_size
+            chunk_overlap = transformation_config.chunking_config.chunk_overlap
+            js_rag_file["upload_rag_file_config"] = {
+                "rag_file_transformation_config": {
+                    "rag_file_chunking_config": {
+                        "fixed_length_chunking": {
+                            "chunk_size": chunk_size,
+                            "chunk_overlap": chunk_overlap,
+                        }
+                    }
+                }
+            }
+        logger.debug(f"  → Build request: {time.time() - t0:.3f}s")
+        
+        # Upload with scoped credentials
+        t0 = time.time()
+        files = {
+            "metadata": (None, str(js_rag_file)),
+            "file": open(path, "rb"),
+        }
+        headers = {"X-Goog-Upload-Protocol": "multipart"}
+        
+        authorized_session = google_auth_requests.AuthorizedSession(credentials=credentials)
+        logger.debug(f"  → Prepare upload: {time.time() - t0:.3f}s")
+        
+        t0 = time.time()
+        try:
+            response = authorized_session.post(
+                url=upload_request_uri,
+                files=files,
+                headers=headers,
+                timeout=600,
+            )
+            logger.info(f"  → HTTP POST upload: {time.time() - t0:.3f}s")
+        except Exception as e:
+            raise RuntimeError(f"Failed in uploading the RagFile: {e}") from e
+        
+        if response.status_code == 404:
+            raise ValueError(f"RagCorpus '{corpus_name}' is not found: {upload_request_uri}")
+        if response.json().get("error"):
+            raise RuntimeError(f"Failed in indexing the RagFile: {response.json().get('error')}")
+            
+        # Convert response to RagFile
+        from vertexai.rag.utils import _gapic_utils
+        return _gapic_utils.convert_json_to_rag_file(response.json())
 
     def get_corpus_stats(self) -> Dict:
         """Get basic statistics about stored audits.
@@ -511,5 +505,67 @@ class RAGCorpusManager:
         except Exception as e:
             logger.error(f"Failed to get stats: {e}")
             return {}
+
+    def wait_for_file_indexed(
+        self, 
+        file_name: str, 
+        max_attempts: int = 4, 
+        base_delay: float = 0.5,
+        verbose: bool = False
+    ) -> bool:
+        """Wait for a specific file to be indexed with exponential backoff.
+        
+        Checks file_status.state field to verify indexing completion.
+        Uses exponential backoff: 0.5s, 1s, 2s, 4s (max 7.5s total).
+        
+        Args:
+            file_name: RAG file resource name to wait for
+            max_attempts: Maximum retry attempts (default: 4)
+            base_delay: Base delay in seconds (default: 0.5s)
+            verbose: Print progress messages (default: False)
+            
+        Returns:
+            True if file is indexed (ACTIVE), False if timeout or error
+            
+        Raises:
+            RuntimeError: If corpus not initialized
+        """
+        if self._corpus_resource_name is None:
+            raise RuntimeError("Corpus not initialized. Call initialize_corpus() first.")
+        
+        from google.cloud.aiplatform_v1.types.vertex_rag_data import FileStatus
+        
+        for attempt in range(max_attempts):
+            if attempt > 0:  # Skip delay on first attempt
+                delay = base_delay * (2 ** (attempt - 1))
+                if verbose:
+                    logger.info(f"Waiting {delay:.1f}s before retry {attempt}/{max_attempts}...")
+                time.sleep(delay)
+            
+            try:
+                files = list(rag.list_files(corpus_name=self._corpus_resource_name))
+                for file in files:
+                    if file.name == file_name:
+                        if hasattr(file, 'file_status') and hasattr(file.file_status, 'state'):
+                            if file.file_status.state == FileStatus.State.ACTIVE:
+                                if verbose:
+                                    logger.info(f"File indexed successfully")
+                                return True
+                            elif file.file_status.state == FileStatus.State.ERROR:
+                                error_msg = file.file_status.error_status or "Unknown error"
+                                logger.error(f"File indexing failed: {error_msg}")
+                                return False
+                            else:
+                                if verbose:
+                                    logger.info(f"File status: {file.file_status.state.name}")
+                        break
+            except Exception as e:
+                logger.warning(f"Error checking file status: {e}")
+                continue
+        
+        logger.warning(f"File not indexed after {max_attempts} attempts")
+        return False
+
+
 
 

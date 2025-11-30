@@ -156,10 +156,29 @@ capstone/
 
 - **ADK (Agent Development Kit)** - Google's framework for agents
 - **Gemini 2.0 Flash Exp** - LLM for AI insights (temperature=0.3)
+- **Vertex AI RAG** - STABLE API ONLY: `from vertexai import rag` (NOT preview!)
 - **bandit** - Python security scanner
 - **radon** - Python complexity analyzer
 - **unidiff** - Git diff parser
 - **PyGithub** - GitHub API client
+
+## CRITICAL: Vertex AI API Rules
+
+**ALWAYS use stable API:**
+```python
+from vertexai import rag  # CORRECT - stable GA API
+```
+
+**NEVER use preview API:**
+```python
+from vertexai.preview import rag  # WRONG - deprecated, forbidden!
+```
+
+**Why this matters:**
+- We migrated to stable API (GA) on Nov 29, 2025
+- Preview API is deprecated and causes confusion
+- All RAG operations (corpus, upload, query) use stable API
+- No exceptions - this rule applies to ALL files
 
 ## Common Patterns
 

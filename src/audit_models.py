@@ -97,60 +97,7 @@ class CommitAudit(BaseModel):
         le=100.0,
         description="Overall quality score (100 = perfect)",
     )
-
-
-class RepositoryAudit(BaseModel):
-    """Audit result for an entire repository scan."""
-
-    repo_identifier: str = Field(description="Repository identifier (owner/repo)")
-    repo_name: str = Field(description="Repository name")
-    default_branch: str = Field(description="Default branch")
-    audit_id: str = Field(description="Unique audit identifier")
-    audit_date: datetime = Field(
-        default_factory=datetime.now, description="When audit was performed"
-    )
-
-    # Scan parameters
-    scan_type: str = Field(
-        description="Type of scan: bootstrap_full, bootstrap_tags, bootstrap_weekly, bootstrap_monthly, sync"
-    )
-    commits_scanned: int = Field(description="Number of commits analyzed")
-    date_range_start: Optional[datetime] = Field(
-        default=None, description="Earliest commit in scan"
-    )
-    date_range_end: Optional[datetime] = Field(
-        default=None, description="Latest commit in scan"
-    )
-
-    # Commit audits
-    commit_audits: List[CommitAudit] = Field(
-        default_factory=list, description="Individual commit audits"
-    )
-
-    # Aggregated metrics
-    total_issues: int = Field(default=0, description="Total issues across all commits")
-    critical_issues: int = Field(
-        default=0, description="Critical severity count across all commits"
-    )
-    high_issues: int = Field(default=0, description="High severity count")
-    medium_issues: int = Field(default=0, description="Medium severity count")
-    low_issues: int = Field(default=0, description="Low severity count")
-
-    # Issue breakdown by type
-    issues_by_type: Dict[str, int] = Field(
-        default_factory=dict, description="Count by issue type"
-    )
-
-    # Quality trends
-    avg_quality_score: float = Field(
-        default=100.0, ge=0.0, le=100.0, description="Average quality across commits"
-    )
-    quality_trend: str = Field(
-        default="stable", description="Trend: improving, stable, declining"
-    )
-
-    # Performance
-    processing_time: float = Field(description="Total time taken in seconds")
+    processing_time: float = Field(default=0.0, description="Processing time in seconds")
 
 
 class QualityQuery(BaseModel):
@@ -238,7 +185,7 @@ class CommandResult(BaseModel):
     command_type: str = Field(description="Command: bootstrap, sync, query")
     status: str = Field(description="Status: success, error, in_progress")
     message: str = Field(description="Human-readable result message")
-    audit: Optional[RepositoryAudit] = Field(
+    audit: Optional[CommitAudit] = Field(
         default=None, description="Audit result if applicable"
     )
     query_response: Optional[QueryResponse] = Field(

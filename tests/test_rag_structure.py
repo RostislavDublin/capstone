@@ -13,7 +13,7 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import vertexai
-from vertexai.preview import rag
+from vertexai import rag
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -40,10 +40,13 @@ def test_rag_query_structure():
     query = "Show all commits"
     print(f"Querying: '{query}'")
     
+    # Use new API with RagRetrievalConfig
     response = rag.retrieval_query(
-        text=query,
         rag_resources=[rag.RagResource(rag_corpus=corpus.name)],
-        similarity_top_k=3,
+        text=query,
+        rag_retrieval_config=rag.RagRetrievalConfig(
+            top_k=3,
+        ),
     )
     
     print(f"\n📊 Response type: {type(response)}")

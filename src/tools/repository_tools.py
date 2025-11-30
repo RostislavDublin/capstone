@@ -19,7 +19,7 @@ def _get_rag_tool():
     """
     from storage.rag_corpus import RAGCorpusManager
     from vertexai.generative_models import Tool
-    from vertexai.preview import rag
+    from vertexai import rag
     import vertexai
     
     project = os.getenv("GOOGLE_CLOUD_PROJECT")
@@ -201,9 +201,11 @@ def check_new_commits(repo: str) -> dict:
         rag = RAGCorpusManager(corpus_name="quality-guardian-audits")
         rag.initialize_corpus()
         
-        # Get last analyzed commit
-        last_audit = rag.get_latest_audit(repo, audit_type="commit")
-        last_sha = last_audit.get("commit_sha") if last_audit else None
+        # Get last analyzed commit from Firestore (deterministic storage)
+        from storage.firestore_client import FirestoreAuditDB
+        firestore_db = FirestoreAuditDB(project_id=project)
+        last_audits = firestore_db.query_by_repository(repo, limit=1, order_by="date", descending=True)
+        last_sha = last_audits[0].commit_sha if last_audits else None
         
         # Get all commits
         commits = connector.list_commits(repo)

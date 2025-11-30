@@ -19,7 +19,7 @@ def test_gemini_with_rag():
     
     # Get corpus ID
     import vertexai
-    from vertexai.preview import rag
+    from vertexai import rag
     
     project = os.getenv("GOOGLE_CLOUD_PROJECT")
     location = os.getenv("VERTEX_LOCATION", "us-west1")

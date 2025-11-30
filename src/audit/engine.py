@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from audit_models import CommitAudit, FileAudit, RepositoryAudit
+from audit_models import CommitAudit, FileAudit
 from connectors.base import CommitInfo, RepositoryConnector
 from lib.complexity_analyzer import calculate_complexity
 from lib.security_scanner import detect_security_issues
@@ -122,101 +122,6 @@ class AuditEngine:
                 low_issues=low_count,
                 quality_score=quality_score,
             )
-
-    def audit_repository(
-        self,
-        repo_identifier: str,
-        commits: List[CommitInfo],
-        scan_type: str = "bootstrap_tags",
-    ) -> RepositoryAudit:
-        """Audit multiple commits to build quality history.
-
-        Args:
-            repo_identifier: Repository identifier
-            commits: List of commits to audit
-            scan_type: Type of scan (bootstrap_full, bootstrap_tags, etc.)
-
-        Returns:
-            RepositoryAudit with aggregated metrics
-        """
-        start_time = datetime.now()
-
-        # Audit each commit
-        commit_audits = []
-        for commit in commits:
-            audit = self.audit_commit(repo_identifier, commit)
-            commit_audits.append(audit)
-
-        # Aggregate metrics
-        total_issues = sum(audit.total_issues for audit in commit_audits)
-        critical_issues = sum(audit.critical_issues for audit in commit_audits)
-        high_issues = sum(audit.high_issues for audit in commit_audits)
-        medium_issues = sum(audit.medium_issues for audit in commit_audits)
-        low_issues = sum(audit.low_issues for audit in commit_audits)
-
-        # Calculate issue breakdown by type
-        issues_by_type = {}
-        for audit in commit_audits:
-            for issue in audit.security_issues:
-                # Security issues use test_id as type
-                issue_type = issue.get("test_id", "unknown")
-                issues_by_type[issue_type] = issues_by_type.get(issue_type, 0) + 1
-            for issue in audit.complexity_issues:
-                issues_by_type["complexity"] = (
-                    issues_by_type.get("complexity", 0) + 1
-                )
-
-        # Calculate quality trend
-        if len(commit_audits) >= 2:
-            recent_scores = [audit.quality_score for audit in commit_audits[:3]]
-            older_scores = [audit.quality_score for audit in commit_audits[-3:]]
-            avg_recent = sum(recent_scores) / len(recent_scores)
-            avg_older = sum(older_scores) / len(older_scores)
-
-            if avg_recent > avg_older + 5:
-                quality_trend = "improving"
-            elif avg_recent < avg_older - 5:
-                quality_trend = "declining"
-            else:
-                quality_trend = "stable"
-        else:
-            quality_trend = "insufficient_data"
-
-        # Get repository info
-        repo_info = self.connector.get_repository_info(repo_identifier)
-
-        # Calculate processing time
-        processing_time = (datetime.now() - start_time).total_seconds()
-
-        # Determine date range
-        date_range_start = min(audit.date for audit in commit_audits) if commit_audits else None
-        date_range_end = max(audit.date for audit in commit_audits) if commit_audits else None
-
-        return RepositoryAudit(
-            repo_identifier=repo_identifier,
-            repo_name=repo_info.name,
-            default_branch=repo_info.default_branch,
-            audit_id=f"{repo_identifier.replace('/', '_')}_{datetime.now().isoformat()}",
-            audit_date=datetime.now(),
-            scan_type=scan_type,
-            commits_scanned=len(commits),
-            date_range_start=date_range_start,
-            date_range_end=date_range_end,
-            commit_audits=commit_audits,
-            total_issues=total_issues,
-            critical_issues=critical_issues,
-            high_issues=high_issues,
-            medium_issues=medium_issues,
-            low_issues=low_issues,
-            issues_by_type=issues_by_type,
-            avg_quality_score=(
-                sum(audit.quality_score for audit in commit_audits) / len(commit_audits)
-                if commit_audits
-                else 100.0
-            ),
-            quality_trend=quality_trend,
-            processing_time=processing_time,
-        )
 
     def _audit_single_file(self, file_path: Path, repo_root: str) -> Optional[FileAudit]:
         """Audit a single file.
