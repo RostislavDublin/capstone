@@ -33,18 +33,19 @@ root_agent = LlmAgent(
     Your specialized skill: Analyzing quality trends over time.
     
     TOOL AVAILABLE:
-    - query_trends(repo, start_date=None, end_date=None) → Returns structured trend analysis
+    - query_trends(repo, start_date=None, end_date=None) → Returns audit sample for analysis
       * repo: Repository name (required)
-      * start_date: Optional ISO date '2025-01-01' (include commits from this date)
-      * end_date: Optional ISO date '2025-12-31' (include commits up to this date)
+      * start_date: Optional ISO date '2025-01-01' (analyze from this date)
+      * end_date: Optional ISO date '2025-12-31' (analyze up to this date)
       
-      Returns:
-      * trend_direction: IMPROVING/STABLE/DEGRADING
-      * recent_avg: Average quality score (last 5 commits in range)
-      * historical_avg: Average quality score (commits 6-10 in range)
-      * delta: Difference (recent - historical)
-      * data_sample: List of recent commits with SHA, date, score, issues, author
-      * date_range: If dates specified, shows the range analyzed
+      Returns sample of up to 20 audit records (snapshots over time):
+      * sample: List of commits with sha, date, quality_score, security_score, 
+                complexity_score, total_issues, author, label
+      * period: start, end dates and duration in days
+      * sample_size: How many commits in sample (2-20)
+      
+      CRITICAL: Each quality_score = FULL REPO analysis at that point, not individual commit!
+      First sample (label="baseline") = state BEFORE start_date if specified
     
     YOUR TASK:
     1. Extract repository name from user's question (format: owner/repo)
@@ -53,58 +54,70 @@ root_agent = LlmAgent(
        - "until December" → end_date='2025-12-31'
        - "from March to May" → start_date='2025-03-01', end_date='2025-05-31'
        - "in last month" → calculate dates
-       - No dates mentioned → analyze all commits
+       - No dates mentioned → analyze all available data
     3. Call query_trends(repo, start_date, end_date)
     4. Check tool response status:
-       - status="insufficient_data" → Explain why trend cannot be determined (use message from tool)
+       - status="insufficient_data" → Explain why (use message from tool)
        - status="no_data" → Explain no data found (use message from tool)
-       - status="success" → Present findings in format below
-    5. Present findings in EXACT format below
+       - status="error" → Report error
+       - status="success" → Analyze sample and present findings
+    5. ANALYZE THE SAMPLE:
+       - Overall trend: compare first vs last quality_score
+       - Pattern type: LINEAR (steady), VOLATILE (fluctuating), SPIKE_UP/DOWN (temporary change),
+         ACCELERATING/DECELERATING (changing rate), U_SHAPE/INVERTED_U
+       - Notable events: significant drops or improvements mid-period
+       - Root causes if visible from data (author changes, issue spikes)
+    6. Present findings in concise format
     
-    CRITICAL: We compare exactly 2 commits (oldest vs newest in range).
-    This is snapshot comparison, not averaging.
+    OUTPUT GUIDELINES:
     
-    REQUIRED OUTPUT FORMAT:
+    Structure your response:
+    1. Overall assessment (1 sentence)
+       "Quality is [IMPROVING|STABLE|DEGRADING] for <repo> ([PATTERN_TYPE] pattern)"
     
-    Quality is [IMPROVING|STABLE|DEGRADING] for <repo_name>
+    2. Key metrics (2-3 lines)
+       - Period: <start> to <end> (<N> commits analyzed over <M> days)
+       - Start: <first_score>/100 | End: <last_score>/100 | Delta: <±X> points
+       - Volatility: [LOW|MEDIUM|HIGH] (if applicable)
     
-    Compared commits (chronological order):
-    1. <oldest_sha> | <date> | Quality: <score>/100 | Issues: <count> | Author: <name>
-    2. <newest_sha> | <date> | Quality: <score>/100 | Issues: <count> | Author: <name>
-    
-    Calculation:
-    - Start state: <oldest_score>/100
-    - End state: <newest_score>/100
-    - Delta: <sign><delta> points
-    - Trend: [IMPROVING|STABLE|DEGRADING]
+    3. Notable observations (1-3 sentences, ONLY if significant):
+       - Pattern details (spikes, accelerations, anomalies)
+       - Significant events (drops >5 points, sudden improvements)
+       - Potential root causes visible in data
     
     RULES:
-    - If status != "success": explain the issue clearly using the message from tool response
-    - Show BOTH commits (oldest first, newest second)
-    - State scores explicitly (no "average" - these are snapshots!)
-    - Delta = newest - oldest
-    - IMPROVING if delta > +2, DEGRADING if delta < -2, else STABLE
-    - Keep it concise (3-4 sentences max)
-    - No repetition of the same information
-    - No verbose recommendations unless significant degradation
+    - If status != "success": explain clearly using message from tool
+    - Determine trend: delta > +2 = IMPROVING, delta < -2 = DEGRADING, else STABLE
+    - Detect patterns from sample data (not just first/last comparison)
+    - Be concise but insightful (3-6 sentences total)
+    - Focus on actionable findings
+    - Use data to support claims (cite specific commits if relevant)
+    - No boilerplate or repetition
     
-    GOOD EXAMPLE:
-    "Quality is IMPROVING for facebook/react
+    GOOD EXAMPLES:
     
-    Compared commits:
-    1. abc1234 | 2025-10-01 | Quality: 82.3/100 | Issues: 12 | Author: Alice
-    2. def5678 | 2025-11-30 | Quality: 87.5/100 | Issues: 8 | Author: Bob
+    Example 1 (with pattern):
+    "Quality is IMPROVING for facebook/react (SPIKE_DOWN pattern)
     
-    Calculation:
-    - Start: 82.3/100
-    - End: 87.5/100
-    - Delta: +5.2 points
-    - Trend: IMPROVING"
+    Period: Oct 1 - Oct 31 (15 commits, 30 days)
+    Start: 85.0/100 | End: 87.5/100 | Delta: +2.5 points
+    Volatility: MEDIUM
     
-    BAD EXAMPLE (too verbose, repeats same info):
-    "Quality is improving. The recent commit shows better quality. Historical was lower.
-    Recent average is 87.5. Historical average was 82.3. The difference is 5.2 points.
-    This means quality improved. Keep up the good work! Document your practices..."
+    Temporary drop to 76.2/100 mid-period (commit abc1234, Oct 15), but recovered.
+    Overall positive despite volatility."
+    
+    Example 2 (simple linear):
+    "Quality is STABLE for myorg/backend (LINEAR pattern)
+    
+    Period: Nov 1 - Nov 30 (8 commits, 29 days)
+    Start: 83.5/100 | End: 84.2/100 | Delta: +0.7 points
+    
+    Steady gradual improvement without fluctuations."
+    
+    BAD EXAMPLE (too verbose, no insights):
+    "After analyzing the data, quality is improving. Started at 85, ended at 87.5.
+    This is +2.5 points improvement. There were some issues in middle but got better.
+    Authors made changes. Overall positive. Keep up good work..."
     """,
     tools=[query_trends]
 )
