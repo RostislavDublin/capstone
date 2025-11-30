@@ -184,25 +184,31 @@ class FirestoreAuditDB:
         descending: bool = True,
         limit: Optional[int] = None
     ) -> List[CommitAudit]:
-        """Advanced query with server-side filtering where possible.
+        """Advanced query with hybrid filtering strategy.
         
-        Uses Firestore native queries for optimal performance:
-        - array_contains_any for files (up to 30)
-        - in operator for authors (up to 30)
-        - Comparison operators for scores and dates
-        - Falls back to client-side filtering for >30 items
+        Server-side filters (no indexes required):
+        - Date range filters ONLY (date >= X, date <= Y)
+        
+        Client-side filters (avoids Firestore composite index requirement):
+        - Authors filter (any number of authors)
+        - Files filter (any number of files)
+        - Quality/security score thresholds (score >= X)
+        
+        Note: Firestore requires composite indexes for multiple range queries.
+        To avoid manual index creation, we only use date range server-side and
+        filter everything else client-side. This works efficiently for <10K commits.
         
         Args:
             repository: Repository name in format "owner/repo"
-            authors: Filter by commit authors (up to 30 optimized, more uses client-side)
-            files: Filter commits touching these files (up to 30 optimized)
-            date_from: Filter commits from this date (inclusive)
-            date_to: Filter commits up to this date (inclusive)
-            min_quality_score: Minimum quality score threshold
-            min_security_score: Minimum security score threshold
+            authors: Filter by commit authors (client-side, any number)
+            files: Filter commits touching these files (client-side, any number)
+            date_from: Filter commits from this date (server-side, inclusive)
+            date_to: Filter commits up to this date (server-side, inclusive)
+            min_quality_score: Minimum quality score threshold (client-side)
+            min_security_score: Minimum security score threshold (client-side)
             order_by: Field to order by (default: "date")
             descending: Sort in descending order (newest first)
-            limit: Maximum number of results to return
+            limit: Maximum number of results to return (applied after filtering)
             
         Returns:
             List of CommitAudit objects matching filters
@@ -219,35 +225,17 @@ class FirestoreAuditDB:
         commits_ref = repo_ref.collection("commits")
         query = commits_ref
         
-        # Date range filters (always server-side)
+        # Date range filters (server-side - only these to avoid composite index requirement)
         if date_from:
             query = query.where(filter=FieldFilter("date", ">=", date_from))
         if date_to:
             query = query.where(filter=FieldFilter("date", "<=", date_to))
         
-        # Quality score filters (server-side)
-        if min_quality_score is not None:
-            query = query.where(filter=FieldFilter("quality_score", ">=", min_quality_score))
-        if min_security_score is not None:
-            query = query.where(filter=FieldFilter("security_score", ">=", min_security_score))
+        # Quality/security score filters: client-side only
+        # (combining with date range requires composite index)
         
-        # Authors filter (server-side if <=30, client-side otherwise)
-        server_side_authors = authors and len(authors) <= 30
-        if server_side_authors:
-            if len(authors) == 1:
-                query = query.where(filter=FieldFilter("author", "==", authors[0]))
-            else:
-                query = query.where(filter=FieldFilter("author", "in", authors))
-            logger.info(f"Server-side author filter: {len(authors)} authors")
-        
-        # Files filter (server-side if <=30, client-side otherwise)
-        server_side_files = files and len(files) <= 30
-        if server_side_files:
-            if len(files) == 1:
-                query = query.where(filter=FieldFilter("files_changed", "array_contains", files[0]))
-            else:
-                query = query.where(filter=FieldFilter("files_changed", "array_contains_any", files))
-            logger.info(f"Server-side files filter: {len(files)} files")
+        # Authors and files filters: client-side only (Firestore requires composite indexes)
+        # These will be filtered after query execution
         
         # Ordering
         query = query.order_by(
@@ -255,9 +243,7 @@ class FirestoreAuditDB:
             direction=firestore.Query.DESCENDING if descending else firestore.Query.ASCENDING
         )
         
-        # Limit (applied before client-side filtering for efficiency)
-        if limit and server_side_authors and server_side_files:
-            query = query.limit(limit)
+        # Note: limit applied after client-side filtering
         
         # Execute query
         docs = query.stream()
@@ -267,13 +253,21 @@ class FirestoreAuditDB:
             try:
                 data = doc.to_dict()
                 
-                # Client-side filtering for >30 items
-                if authors and len(authors) > 30:
+                # Client-side filtering (always, to avoid Firestore composite index requirements)
+                if authors:
                     if data.get("author") not in authors:
                         continue
                 
-                if files and len(files) > 30:
+                if files:
                     if not any(f in data.get("files_changed", []) for f in files):
+                        continue
+                
+                if min_quality_score is not None:
+                    if data.get("quality_score", 0) < min_quality_score:
+                        continue
+                
+                if min_security_score is not None:
+                    if data.get("security_score", 0) < min_security_score:
                         continue
                 
                 audit = CommitAudit(**data)
@@ -292,12 +286,12 @@ class FirestoreAuditDB:
             filter_desc.append(f"authors={len(authors)}")
         if files:
             filter_desc.append(f"files={len(files)}")
-        if date_from or date_to:
-            filter_desc.append(f"date_range")
         if min_quality_score:
             filter_desc.append(f"quality>={min_quality_score}")
         if min_security_score:
             filter_desc.append(f"security>={min_security_score}")
+        if date_from or date_to:
+            filter_desc.append(f"date_range")
         
         logger.info(
             f"Retrieved {len(audits)} commits for {repository} "

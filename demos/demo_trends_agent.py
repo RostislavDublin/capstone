@@ -117,12 +117,20 @@ async def demo_trends_agent():
         expected_pattern = query_data["pattern"]
         
         print_header(f"Test {i}/{len(queries)}: {desc}")
-        print(f"Expected pattern: {expected_pattern}\n")
         
         try:
-            # run_debug() prints agent response automatically, returns complex object with parts
-            # We don't need to capture or print the response - just let ADK handle it
-            await runner.run_debug(question)
+            # Capture output and filter Event objects
+            import io
+            import contextlib
+            
+            f = io.StringIO()
+            with contextlib.redirect_stdout(f):
+                await runner.run_debug(question)
+            
+            # Print only User/Agent dialogue, skip Event lines
+            for line in f.getvalue().split('\n'):
+                if not line.strip().startswith('[Event(') and not line.strip().startswith(')'):
+                    print(line)
             
         except Exception as e:
             print(f"\n❌ ERROR: {e}")
@@ -130,16 +138,6 @@ async def demo_trends_agent():
             traceback.print_exc()
         
         print()
-    
-    print_header("Summary")
-    print(f"Tests completed: {len(queries)}")
-    print("\nPattern demonstration:")
-    print("  ✓ VOLATILE - full history with ups and downs")
-    print("  ✓ LINEAR - steady improvement in early phase")
-    print("  ✓ SPIKE_DOWN - regressions at commits 5-7 and 13-15")
-    print("  ✓ SPIKE_UP - recovery at commits 7-9")
-    print("  ✓ ACCELERATING - growth phase at commits 9-13")
-    print()
 
 
 def main():

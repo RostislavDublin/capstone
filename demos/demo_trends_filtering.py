@@ -73,19 +73,19 @@ async def demo_filtering():
     # Test scenarios
     scenarios = [
         {
-            "title": "File-specific trends: app.py",
-            "query": f"Show quality trends for app.py file in {test_repo}",
-            "description": "Filter commits that touched app.py"
+            "title": "File-specific trends: app/main.py",
+            "query": f"Show quality trends for app/main.py file in {test_repo}",
+            "description": "Filter commits that touched app/main.py"
         },
         {
-            "title": "Author-specific trends: Alice Developer",
-            "query": f"Show quality trends for commits by Alice Developer in {test_repo}",
+            "title": "Author-specific trends: Junior Dev",
+            "query": f"Show quality trends for commits by Junior Dev in {test_repo}",
             "description": "Filter commits by specific author"
         },
         {
-            "title": "Multiple files: app.py and api.py",
-            "query": f"Show quality trends for app.py and api.py files in {test_repo}",
-            "description": "Filter commits touching multiple files"
+            "title": "Same file again (verification)",
+            "query": f"Show quality trends for app/main.py in {test_repo}",
+            "description": "Verify consistent results for same file"
         },
         {
             "title": "Quality threshold: Only good commits",
@@ -98,8 +98,8 @@ async def demo_filtering():
             "description": "Filter by minimum security score"
         },
         {
-            "title": "Combined: app.py by Alice with good quality",
-            "query": f"Show trends for app.py commits by Alice Developer with quality above 75 in {test_repo}",
+            "title": "Combined: app/main.py by Junior Dev with good quality",
+            "query": f"Show trends for app/main.py commits by Junior Dev with quality above 75 in {test_repo}",
             "description": "Multiple filters combined"
         }
     ]
@@ -110,8 +110,18 @@ async def demo_filtering():
         print(f"Query: {scenario['query']}\n")
         
         try:
-            response = await runner.run_debug(scenario["query"])
-            print(response)
+            # Capture output and filter Event objects
+            import io
+            import contextlib
+            
+            f = io.StringIO()
+            with contextlib.redirect_stdout(f):
+                await runner.run_debug(scenario["query"])
+            
+            # Print only User/Agent dialogue, skip Event lines
+            for line in f.getvalue().split('\n'):
+                if not line.strip().startswith('[Event(') and not line.strip().startswith(')'):
+                    print(line)
         except Exception as e:
             print(f"ERROR: {e}")
         

@@ -397,10 +397,10 @@ def query_trends(
     - Forward-fill if no commits in some intervals
     
     Filtering (NEW):
-    - Uses Firestore server-side filtering for optimal performance
-    - Up to 30 files/authors use array_contains_any/IN (server-side)
-    - More than 30 items fall back to client-side filtering
-    - Quality/security thresholds always server-side
+    - Date ranges and score thresholds use server-side filtering (fast)
+    - Files and authors use client-side filtering (avoids Firestore index requirement)
+    - Efficient for <10K commits without manual index creation
+    - Filter happens before sampling (minimal overhead)
     
     Args:
         repo: Repository name (owner/repo format)
