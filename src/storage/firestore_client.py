@@ -171,6 +171,140 @@ class FirestoreAuditDB:
         )
         return audits
     
+    def query_with_filters(
+        self,
+        repository: str,
+        authors: Optional[List[str]] = None,
+        files: Optional[List[str]] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
+        min_quality_score: Optional[float] = None,
+        min_security_score: Optional[float] = None,
+        order_by: str = "date",
+        descending: bool = True,
+        limit: Optional[int] = None
+    ) -> List[CommitAudit]:
+        """Advanced query with server-side filtering where possible.
+        
+        Uses Firestore native queries for optimal performance:
+        - array_contains_any for files (up to 30)
+        - in operator for authors (up to 30)
+        - Comparison operators for scores and dates
+        - Falls back to client-side filtering for >30 items
+        
+        Args:
+            repository: Repository name in format "owner/repo"
+            authors: Filter by commit authors (up to 30 optimized, more uses client-side)
+            files: Filter commits touching these files (up to 30 optimized)
+            date_from: Filter commits from this date (inclusive)
+            date_to: Filter commits up to this date (inclusive)
+            min_quality_score: Minimum quality score threshold
+            min_security_score: Minimum security score threshold
+            order_by: Field to order by (default: "date")
+            descending: Sort in descending order (newest first)
+            limit: Maximum number of results to return
+            
+        Returns:
+            List of CommitAudit objects matching filters
+        """
+        repo_id = self._get_repo_id(repository)
+        repo_ref = self.client.collection(self.repositories_collection).document(repo_id)
+        
+        # Check if repository exists
+        if not repo_ref.get().exists:
+            logger.warning(f"Repository not found: {repository}")
+            return []
+        
+        # Build query with server-side filters
+        commits_ref = repo_ref.collection("commits")
+        query = commits_ref
+        
+        # Date range filters (always server-side)
+        if date_from:
+            query = query.where(filter=FieldFilter("date", ">=", date_from))
+        if date_to:
+            query = query.where(filter=FieldFilter("date", "<=", date_to))
+        
+        # Quality score filters (server-side)
+        if min_quality_score is not None:
+            query = query.where(filter=FieldFilter("quality_score", ">=", min_quality_score))
+        if min_security_score is not None:
+            query = query.where(filter=FieldFilter("security_score", ">=", min_security_score))
+        
+        # Authors filter (server-side if <=30, client-side otherwise)
+        server_side_authors = authors and len(authors) <= 30
+        if server_side_authors:
+            if len(authors) == 1:
+                query = query.where(filter=FieldFilter("author", "==", authors[0]))
+            else:
+                query = query.where(filter=FieldFilter("author", "in", authors))
+            logger.info(f"Server-side author filter: {len(authors)} authors")
+        
+        # Files filter (server-side if <=30, client-side otherwise)
+        server_side_files = files and len(files) <= 30
+        if server_side_files:
+            if len(files) == 1:
+                query = query.where(filter=FieldFilter("files_changed", "array_contains", files[0]))
+            else:
+                query = query.where(filter=FieldFilter("files_changed", "array_contains_any", files))
+            logger.info(f"Server-side files filter: {len(files)} files")
+        
+        # Ordering
+        query = query.order_by(
+            order_by,
+            direction=firestore.Query.DESCENDING if descending else firestore.Query.ASCENDING
+        )
+        
+        # Limit (applied before client-side filtering for efficiency)
+        if limit and server_side_authors and server_side_files:
+            query = query.limit(limit)
+        
+        # Execute query
+        docs = query.stream()
+        audits = []
+        
+        for doc in docs:
+            try:
+                data = doc.to_dict()
+                
+                # Client-side filtering for >30 items
+                if authors and len(authors) > 30:
+                    if data.get("author") not in authors:
+                        continue
+                
+                if files and len(files) > 30:
+                    if not any(f in data.get("files_changed", []) for f in files):
+                        continue
+                
+                audit = CommitAudit(**data)
+                audits.append(audit)
+                
+                # Apply limit after client-side filtering
+                if limit and len(audits) >= limit:
+                    break
+                    
+            except Exception as e:
+                logger.error(f"Failed to parse commit audit {doc.id}: {e}")
+                continue
+        
+        filter_desc = []
+        if authors:
+            filter_desc.append(f"authors={len(authors)}")
+        if files:
+            filter_desc.append(f"files={len(files)}")
+        if date_from or date_to:
+            filter_desc.append(f"date_range")
+        if min_quality_score:
+            filter_desc.append(f"quality>={min_quality_score}")
+        if min_security_score:
+            filter_desc.append(f"security>={min_security_score}")
+        
+        logger.info(
+            f"Retrieved {len(audits)} commits for {repository} "
+            f"with filters: {', '.join(filter_desc) if filter_desc else 'none'}"
+        )
+        return audits
+    
     def get_repository_stats(self, repository: str) -> Optional[Dict[str, Any]]:
         """Get statistics for a repository.
         

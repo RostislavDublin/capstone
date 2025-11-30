@@ -370,8 +370,16 @@ def query_trends_v1_old(repo: str, start_date: str = None, end_date: str = None)
         }
 
 
-def query_trends(repo: str, start_date: str = None, end_date: str = None) -> dict:
-    """Fetch audit sample for intelligent trend analysis by agent.
+def query_trends(
+    repo: str, 
+    start_date: str = None, 
+    end_date: str = None,
+    files: list = None,
+    authors: list = None,
+    min_quality_score: float = None,
+    min_security_score: float = None
+) -> dict:
+    """Fetch audit sample for intelligent trend analysis by agent with advanced filtering.
     
     NEW APPROACH (v2 - Smart Agent):
     - Tool returns RAW DATA (up to 20 audit snapshots)
@@ -388,10 +396,20 @@ def query_trends(repo: str, start_date: str = None, end_date: str = None) -> dic
     - If start_date specified: first sample is BEFORE start_date (baseline state)
     - Forward-fill if no commits in some intervals
     
+    Filtering (NEW):
+    - Uses Firestore server-side filtering for optimal performance
+    - Up to 30 files/authors use array_contains_any/IN (server-side)
+    - More than 30 items fall back to client-side filtering
+    - Quality/security thresholds always server-side
+    
     Args:
         repo: Repository name (owner/repo format)
         start_date: Optional ISO date '2025-01-01' (analyze from this date)
         end_date: Optional ISO date '2025-12-31' (analyze up to this date)
+        files: Optional list of file paths to filter by (e.g., ["src/api.py", "src/auth.py"])
+        authors: Optional list of commit authors to filter by (e.g., ["Alice", "Bob"])
+        min_quality_score: Optional minimum quality score threshold (0-100)
+        min_security_score: Optional minimum security score threshold (0-100)
     
     Returns:
         {
@@ -403,12 +421,15 @@ def query_trends(repo: str, start_date: str = None, end_date: str = None) -> dic
                     "date": "2025-10-25T10:30:00Z",
                     "quality_score": 82.6,
                     "security_score": 85.0,
-                    "complexity_score": 80.0,
+                    "complexity_score": 5.2,  # avg_complexity
                     "total_issues": 8,
-                    "security_issues": 2,
-                    "complexity_issues": 6,
+                    "critical_issues": 0,
+                    "high_issues": 2,
+                    "medium_issues": 4,
+                    "low_issues": 2,
                     "author": "Alice",
-                    "label": "baseline" | "in_range"
+                    "label": "baseline" | "in_range" | "oldest" | "newest",
+                    "files_in_scope": 2  # Only if files filter was used
                 },
                 ...  # up to 20 commits
             ],
@@ -418,8 +439,16 @@ def query_trends(repo: str, start_date: str = None, end_date: str = None) -> dic
                 "days": 37
             },
             "total_commits_in_db": 45,
-            "sample_size": 15
+            "sample_size": 15,
+            "filters_applied": {
+                "files": ["src/api.py"],  # If filters were used
+                "authors": ["Alice", "Bob"],
+                "min_quality_score": 75.0
+            }
         }
+        
+        Note: security_issues and complexity_issues arrays are NOT included 
+        to save token capacity. Agent analyzes aggregate metrics only.
     """
     try:
         from storage.firestore_client import FirestoreAuditDB
@@ -443,8 +472,27 @@ def query_trends(repo: str, start_date: str = None, end_date: str = None) -> dic
                 "message": f"No audit data found for {repo}. Run bootstrap or sync first."
             }
         
-        # Get all commits (we'll filter and sample)
-        commits = db.query_by_repository(repo, order_by="date", descending=True)
+        # Parse dates if provided
+        date_from_dt = None
+        date_to_dt = None
+        if start_date:
+            date_from_dt = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
+        if end_date:
+            date_to_dt = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc)
+        
+        # Get commits with advanced filtering
+        # Use query_with_filters for server-side optimization
+        commits = db.query_with_filters(
+            repository=repo,
+            authors=authors,
+            files=files,
+            date_from=date_from_dt,
+            date_to=date_to_dt,
+            min_quality_score=min_quality_score,
+            min_security_score=min_security_score,
+            order_by="date",
+            descending=True
+        )
         
         if not commits:
             return {
@@ -512,18 +560,27 @@ def query_trends(repo: str, start_date: str = None, end_date: str = None) -> dic
             else:
                 label = "in_range"
             
-            sample.append({
+            # Include only aggregate metrics (no detail arrays for token efficiency)
+            sample_data = {
                 "sha": commit.commit_sha[:7],
                 "date": commit.date.isoformat(),
                 "quality_score": round(commit.quality_score, 1),
                 "security_score": round(commit.security_score, 1) if hasattr(commit, 'security_score') else None,
-                "complexity_score": round(commit.complexity_score, 1) if hasattr(commit, 'complexity_score') else None,
+                "complexity_score": round(commit.avg_complexity, 1) if hasattr(commit, 'avg_complexity') else None,
                 "total_issues": commit.total_issues,
-                "security_issues": commit.security_issues if hasattr(commit, 'security_issues') else None,
-                "complexity_issues": commit.complexity_issues if hasattr(commit, 'complexity_issues') else None,
+                "critical_issues": commit.critical_issues if hasattr(commit, 'critical_issues') else 0,
+                "high_issues": commit.high_issues if hasattr(commit, 'high_issues') else 0,
+                "medium_issues": commit.medium_issues if hasattr(commit, 'medium_issues') else 0,
+                "low_issues": commit.low_issues if hasattr(commit, 'low_issues') else 0,
                 "author": commit.author,
                 "label": label
-            })
+            }
+            
+            # Add file count if file filtering was used
+            if files:
+                sample_data["files_in_scope"] = len([f for f in commit.files_changed if f in files])
+            
+            sample.append(sample_data)
         
         # Calculate period info
         period_start = sample[0]["date"][:10]  # ISO date only
@@ -545,6 +602,20 @@ def query_trends(repo: str, start_date: str = None, end_date: str = None) -> dic
             "total_commits_in_db": len(commits),
             "sample_size": len(sample)
         }
+        
+        # Add filters_applied for transparency
+        filters_applied = {}
+        if files:
+            filters_applied["files"] = files
+        if authors:
+            filters_applied["authors"] = authors
+        if min_quality_score is not None:
+            filters_applied["min_quality_score"] = min_quality_score
+        if min_security_score is not None:
+            filters_applied["min_security_score"] = min_security_score
+        
+        if filters_applied:
+            result["filters_applied"] = filters_applied
         
         logger.info(f"Trend analysis sample for {repo}: {len(sample)} commits over {days} days")
         
