@@ -33,7 +33,7 @@ if _env_file.exists():
 TEST_REPO_NAME = os.getenv("TEST_REPO_NAME", "quality-guardian-test-fixture")
 TEST_REPO_OWNER = "RostislavDublin"
 TEST_REPO_FULL = f"{TEST_REPO_OWNER}/{TEST_REPO_NAME}"
-MIN_COMMITS = 5
+MIN_COMMITS = 15
 FIXTURE_PATH = Path(__file__).parent / "test-app"
 
 
@@ -102,7 +102,7 @@ class TestRepoFixture:
     def populate(self) -> None:
         """Populate repo with test commits from fixture.
         
-        Creates 5 controlled commits with test-app code.
+        Creates 15 controlled commits with test-app code.
         """
         logger.info("Populating repository with test commits...")
         
@@ -112,7 +112,7 @@ class TestRepoFixture:
         repo = self.client.get_repo(TEST_REPO_FULL)
         
         # Commit 1: Initial structure
-        logger.info("  1/5: Initial project structure")
+        logger.info("  1/15: Initial project structure")
         self._commit_files(repo, [
             ("README.md", FIXTURE_PATH / "README.md"),
             ("requirements.txt", FIXTURE_PATH / "requirements.txt"),
@@ -120,7 +120,7 @@ class TestRepoFixture:
         ], "Initial commit: project structure")
         
         # Commit 2: Add app module
-        logger.info("  2/5: Add application code")
+        logger.info("  2/15: Add application code")
         self._commit_files(repo, [
             ("app/__init__.py", FIXTURE_PATH / "app/__init__.py"),
             ("app/main.py", FIXTURE_PATH / "app/main.py"),
@@ -128,22 +128,83 @@ class TestRepoFixture:
         ], "feat: Add main application module")
         
         # Commit 3: Add database (with intentional security issues)
-        logger.info("  3/5: Add database module")
+        logger.info("  3/15: Add database module")
         self._commit_files(repo, [
             ("app/database.py", FIXTURE_PATH / "app/database.py"),
         ], "feat: Add database connection")
         
         # Commit 4: Add utilities
-        logger.info("  4/5: Add utility functions")
+        logger.info("  4/15: Add utility functions")
         self._commit_files(repo, [
             ("app/utils.py", FIXTURE_PATH / "app/utils.py"),
         ], "feat: Add utility helpers")
         
         # Commit 5: Add tests
-        logger.info("  5/5: Add test suite")
+        logger.info("  5/15: Add test suite")
         self._commit_files(repo, [
             ("tests/test_app.py", FIXTURE_PATH / "tests/test_app.py"),
         ], "test: Add initial test suite")
+        
+        # Commit 6: Update README
+        logger.info("  6/15: Update documentation")
+        self._commit_files(repo, [
+            ("README.md", FIXTURE_PATH / "README.md"),
+        ], "docs: Update README with usage examples")
+        
+        # Commit 7: Refactor main
+        logger.info("  7/15: Refactor main module")
+        self._commit_files(repo, [
+            ("app/main.py", FIXTURE_PATH / "app/main.py"),
+        ], "refactor: Improve main module structure")
+        
+        # Commit 8: Update config
+        logger.info("  8/15: Update configuration")
+        self._commit_files(repo, [
+            ("app/config.py", FIXTURE_PATH / "app/config.py"),
+        ], "feat: Enhance configuration options")
+        
+        # Commit 9: Improve database
+        logger.info("  9/15: Improve database module")
+        self._commit_files(repo, [
+            ("app/database.py", FIXTURE_PATH / "app/database.py"),
+        ], "fix: Improve database error handling")
+        
+        # Commit 10: Update utils
+        logger.info("  10/15: Update utilities")
+        self._commit_files(repo, [
+            ("app/utils.py", FIXTURE_PATH / "app/utils.py"),
+        ], "feat: Add new utility functions")
+        
+        # Commit 11: Improve tests
+        logger.info("  11/15: Enhance test coverage")
+        self._commit_files(repo, [
+            ("tests/test_app.py", FIXTURE_PATH / "tests/test_app.py"),
+        ], "test: Improve test coverage")
+        
+        # Commit 12: Code cleanup
+        logger.info("  12/15: Code cleanup")
+        self._commit_files(repo, [
+            ("app/__init__.py", FIXTURE_PATH / "app/__init__.py"),
+        ], "style: Code cleanup and formatting")
+        
+        # Commit 13: Update dependencies
+        logger.info("  13/15: Update dependencies")
+        self._commit_files(repo, [
+            ("requirements.txt", FIXTURE_PATH / "requirements.txt"),
+        ], "chore: Update dependencies")
+        
+        # Commit 14: Improve gitignore
+        logger.info("  14/15: Update gitignore")
+        self._commit_files(repo, [
+            (".gitignore", FIXTURE_PATH / ".gitignore"),
+        ], "chore: Update .gitignore")
+        
+        # Commit 15: Final polish
+        logger.info("  15/15: Final polish")
+        self._commit_files(repo, [
+            ("README.md", FIXTURE_PATH / "README.md"),
+            ("app/main.py", FIXTURE_PATH / "app/main.py"),
+        ], "polish: Final improvements and documentation")
         
         logger.info(f"✅ Created {MIN_COMMITS} commits")
 
@@ -309,8 +370,8 @@ def reset_to_fixture_state(initial_commits: int = 3) -> str:
     3. Applies initial fixture commits (default: 3 for bootstrap)
     
     Args:
-        initial_commits: Number of commits to apply initially (1-5)
-                        Default 3 leaves 2 commits for sync testing
+        initial_commits: Number of commits to apply initially (1-15)
+                        Default 3 leaves 12 commits for sync testing
     
     Returns:
         Repository full name
@@ -398,7 +459,7 @@ def apply_remaining_fixture_commits(start_from: int = 4) -> int:
     that sync agent can detect.
     
     Args:
-        start_from: Which commit to start from (1-5)
+        start_from: Which commit to start from (1-15)
         
     Returns:
         Number of commits applied
@@ -423,7 +484,7 @@ def apply_remaining_fixture_commits(start_from: int = 4) -> int:
     )
     
     # Apply remaining commits
-    remaining = 5 - start_from + 1  # e.g., start_from=4 → commits 4,5 → 2 commits
+    remaining = 15 - start_from + 1  # e.g., start_from=4 → commits 4-15 → 12 commits
     _apply_fixture_commits(temp_dir, start=start_from - 1, count=remaining)
     
     # Push
@@ -447,7 +508,7 @@ def _apply_fixture_commits(repo_path: Path, start: int = 0, count: int = 5):
     
     Args:
         repo_path: Path to git repository
-        start: Starting index (0-4)
+        start: Starting index (0-14)
         count: Number of commits to apply
     """
     from datetime import datetime, timedelta
@@ -461,6 +522,16 @@ def _apply_fixture_commits(repo_path: Path, start: int = 0, count: int = 5):
         "commit_03_add_password_validation",
         "commit_04_refactor_config",
         "commit_05_add_validation",
+        "commit_06_remove_validation",
+        "commit_07_add_unsafe_feature",
+        "commit_08_fix_upload_validation",
+        "commit_09_restore_search_validation",
+        "commit_10_add_caching",
+        "commit_11_add_metrics",
+        "commit_12_remove_eval",
+        "commit_13_add_auth",
+        "commit_14_rushed_feature",
+        "commit_15_disable_logging",
     ]
     
     # Select commits to apply

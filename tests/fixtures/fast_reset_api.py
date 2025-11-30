@@ -25,7 +25,7 @@ def reset_to_fixture_state_api(initial_commits: int = 3) -> str:
     """Reset test repository using GitHub API (fast, no clone).
     
     Args:
-        initial_commits: Number of fixture commits (1-5)
+        initial_commits: Number of fixture commits (1-15)
         
     Returns:
         Repository name
@@ -106,6 +106,16 @@ def reset_to_fixture_state_api(initial_commits: int = 3) -> str:
         "commit_03_add_password_validation",
         "commit_04_refactor_config",
         "commit_05_add_validation",
+        "commit_06_remove_validation",
+        "commit_07_add_unsafe_feature",
+        "commit_08_fix_upload_validation",
+        "commit_09_restore_search_validation",
+        "commit_10_add_caching",
+        "commit_11_add_metrics",
+        "commit_12_remove_eval",
+        "commit_13_add_auth",
+        "commit_14_rushed_feature",
+        "commit_15_disable_logging",
     ][:initial_commits]
     
     # Start commits 30 days ago, then space 1 day apart

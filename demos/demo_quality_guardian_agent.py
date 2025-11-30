@@ -128,13 +128,15 @@ async def demo_natural_language_commands():
     runner = InMemoryRunner(agent=root_agent, app_name="quality_guardian")
     print("✅ Agent runner ready (ADK)\n")
     
-    # SETUP 1: Reset to 3 fixture commits for bootstrap
+    # SETUP 1: Reset to 13 fixture commits for bootstrap
     print_section("📝 SETUP 1: Prepare Repository for Bootstrap")
-    print("Resetting to 3 fixture commits (4 total with initial)...\n")
+    print("Resetting to 13 fixture commits (14 total with initial)...\n")
+    print("Timeline: commits 1-5 (initial), 6-7 (regression), 8-9 (recovery),")
+    print("          10-11 (growth), 12-13 (improvement)\n")
     
     from fixtures.fast_reset_api import reset_to_fixture_state_api
-    reset_to_fixture_state_api(initial_commits=3)
-    print(f"✅ Repository ready: {test_repo} with 4 commits (initial + 3 fixtures)\n")
+    reset_to_fixture_state_api(initial_commits=13)
+    print(f"✅ Repository ready: {test_repo} with 14 commits (initial + 13 fixtures)\n")
     
     print("Cleaning storage (Firestore + RAG)...")
     clean_all_storage()
@@ -154,10 +156,10 @@ async def demo_natural_language_commands():
         collection_prefix="quality-guardian"
     )
     
-    # Test 1: Bootstrap with 4 commits (initial + 3 fixtures)
+    # Test 1: Bootstrap with 14 commits (initial + 13 fixtures)
     print_section("TEST 1: Bootstrap Command (Natural Language)")
     
-    command1 = f"Bootstrap {test_repo} with 4 commits"
+    command1 = f"Bootstrap {test_repo} with 14 commits"
     print(f"User: '{command1}'\n")
     
     _ = await runner.run_debug(command1)
@@ -184,14 +186,15 @@ async def demo_natural_language_commands():
     else:
         print(f"[NOTE] RAG may lag behind Firestore ({rag_files} vs {stats['total_commits']})\n")
     
-    # SETUP 2: Add 2 more commits on top (now 6 total)
+    # SETUP 2: Add 2 more commits on top (now 16 total)
     print_section("📝 SETUP 2: Add New Commits for Sync Test")
-    print("Adding 2 more fixture commits on top (6 total)...")
+    print("Adding 2 more fixture commits on top (16 total)...")
+    print("(Commits 14-15: regression phase - rushed admin + disabled logging)")
     print("(Simulates real-world: new code pushed after bootstrap)\n")
     
     from fixtures import apply_remaining_fixture_commits
-    added = apply_remaining_fixture_commits(start_from=4)
-    print(f"✅ Added {added} new commits to {test_repo} (now 6 total)\n")
+    added = apply_remaining_fixture_commits(start_from=14)
+    print(f"✅ Added {added} new commits to {test_repo} (now 16 total)\n")
     
     # Test 2: Sync command
     print_section("TEST 2: Sync Command (Check for New Commits)")
