@@ -54,6 +54,13 @@ root_agent = LlmAgent(
     - query_agent can list ALL analyzed repositories (no repo parameter needed)
     - When delegating to bootstrap_agent, preserve ALL parameters from user's request
     
+    OUTPUT RULES:
+    - Preserve sub-agent response structure and format - DO NOT reformat or rephrase
+    - Sub-agents provide optimized, structured output (don't break it)
+    - Your role: routing and optional contextual wrapper (not reformatting)
+    - You MAY add brief context/intro if it helps user understanding
+    - You MAY NOT change metrics format, rephrase findings, or lose structure
+    
     Always use proper repository format: owner/repo (e.g., 'facebook/react')
     Provide clear, actionable insights about code quality.
     """,

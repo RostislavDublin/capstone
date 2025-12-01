@@ -68,7 +68,7 @@ async def demo_filtering():
     print("Testing: File filters, author filters, quality thresholds\n")
     
     # Create runner (use consistent app_name across all demos)
-    runner = InMemoryRunner(agent=trends_agent, app_name="quality_guardian")
+    runner = InMemoryRunner(agent=trends_agent, app_name="agents")
     
     # Test scenarios
     scenarios = [

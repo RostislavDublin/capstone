@@ -52,6 +52,17 @@ async def demo_trends_agent():
     
     test_repo = get_test_repo_name()
     
+    # Get actual commit dates from Firestore
+    from storage.firestore_client import FirestoreAuditDB
+    db = FirestoreAuditDB()
+    commits = db.query_by_repository(repository=test_repo, limit=20, descending=False)
+    
+    if not commits or len(commits) < 15:
+        print("ERROR: Not enough commits in test repo. Run reset_fixture.py first.")
+        return
+    
+    # Extract base date from first commit
+    base_date = commits[0].date
     print("\n" + "╔" + "="*78 + "╗")
     print("║" + " "*78 + "║")
     print("║" + "  TRENDS AGENT - Realistic Quality Patterns Demo".center(78) + "║")
@@ -61,8 +72,9 @@ async def demo_trends_agent():
     print("╚" + "="*78 + "╝\n")
     
     print(f"Repository: {test_repo}")
-    print("Commits: 15 (realistic evolution with regressions and improvements)")
+    print(f"Commits: {len(commits)} (realistic evolution with regressions and improvements)")
     print("Data source: Firestore (deterministic)")
+    print(f"Base date: {base_date.strftime('%Y-%m-%d')} (first commit)")
     print("Agent: query_trends (pattern detection)\n")
     
     print("Commit timeline:")
@@ -74,47 +86,51 @@ async def demo_trends_agent():
     print("  14-15: REGRESSION (rushed admin, disabled logging)\n")
     
     # Create runner (use consistent app_name across all demos)
-    runner = InMemoryRunner(agent=trends_agent, app_name="quality_guardian")
+    runner = InMemoryRunner(agent=trends_agent, app_name="agents")
     
-    # Test queries designed to show different patterns
-    # Dates based on: initial commit 35 days ago, then commits every day starting 30 days ago
+    # Calculate date ranges based on actual commit dates
+    # Commits: [0]=init+35d, [1-15]=30d ago + 0-14 days
+    from datetime import timedelta
+    
+    # Use actual commit dates for precise queries
+    c1_date = commits[0].date.strftime('%Y-%m-%d')  # Commit 1 (init)
+    c5_date = commits[4].date.strftime('%Y-%m-%d')  # Commit 5
+    c7_date = commits[6].date.strftime('%Y-%m-%d')  # Commit 7
+    c9_date = commits[8].date.strftime('%Y-%m-%d')  # Commit 9
+    c13_date = commits[12].date.strftime('%Y-%m-%d')  # Commit 13
+    c15_date = commits[14].date.strftime('%Y-%m-%d')  # Commit 15
+    last_date = commits[-1].date.strftime('%Y-%m-%d')  # Last commit
+    
     queries = [
         {
             "q": f"Show quality trends for {test_repo}",
-            "desc": "Full history - expect VOLATILE pattern",
-            "pattern": "VOLATILE (ups and downs throughout)"
+            "desc": "Full history (all commits)",
         },
         {
-            "q": f"Show trends for {test_repo} from October 31 to November 4",
-            "desc": "Early phase (commits 1-5) - expect LINEAR improvement",
-            "pattern": "LINEAR (initial development)"
+            "q": f"Show trends for {test_repo} from {c1_date} to {c5_date}",
+            "desc": "Early phase (commits 1-5)",
         },
         {
-            "q": f"Show trends for {test_repo} from November 4 to November 6",
-            "desc": "Regression phase (commits 5-7) - expect SPIKE_DOWN",
-            "pattern": "SPIKE_DOWN (validation removed)"
+            "q": f"Show trends for {test_repo} from {c5_date} to {c7_date}",
+            "desc": "Middle phase (commits 5-7)",
         },
         {
-            "q": f"Show trends for {test_repo} from November 6 to November 8",
-            "desc": "Recovery phase (commits 7-9) - expect SPIKE_UP",
-            "pattern": "SPIKE_UP (security fixes)"
+            "q": f"Show trends for {test_repo} from {c7_date} to {c9_date}",
+            "desc": "Phase (commits 7-9)",
         },
         {
-            "q": f"Show trends for {test_repo} from November 8 to November 12",
-            "desc": "Growth phase (commits 9-13) - expect ACCELERATING",
-            "pattern": "ACCELERATING (features + auth)"
+            "q": f"Show trends for {test_repo} from {c9_date} to {c13_date}",
+            "desc": "Growth phase (commits 9-13)",
         },
         {
-            "q": f"Show trends for {test_repo} from November 12 to November 14",
-            "desc": "Final regression (commits 13-15) - expect SPIKE_DOWN",
-            "pattern": "SPIKE_DOWN (rushed features)"
+            "q": f"Show trends for {test_repo} from {c13_date} to {last_date}",
+            "desc": "Final phase (commits 13-15)",
         },
     ]
     
     for i, query_data in enumerate(queries, 1):
         question = query_data["q"]
         desc = query_data["desc"]
-        expected_pattern = query_data["pattern"]
         
         print_header(f"Test {i}/{len(queries)}: {desc}")
         

@@ -211,9 +211,34 @@ class AuditEngine:
                 low_issues=low_count,
                 quality_score=quality_score,
             )
-        except Exception:
-            # Skip files that can't be analyzed
-            return None
+        except Exception as e:
+            # File has critical issues (syntax error, encoding error, etc.)
+            # Return FileAudit with quality_score=0 instead of skipping
+            relative_path = str(file_path.relative_to(repo_root))
+            error_msg = str(e)
+            
+            return FileAudit(
+                file_path=relative_path,
+                security_issues=[],
+                security_score=0.0,
+                complexity_issues=[{
+                    "type": "syntax",
+                    "severity": "critical",
+                    "message": f"Failed to analyze file: {error_msg}",
+                    "line": 0,
+                    "file": relative_path,
+                }],
+                avg_complexity=0.0,
+                max_complexity=0.0,
+                function_count=0,
+                lines_of_code=0,
+                total_issues=1,
+                critical_issues=1,
+                high_issues=0,
+                medium_issues=0,
+                low_issues=0,
+                quality_score=0.0,  # Critical: file is broken
+            )
 
     def _get_complexity_severity(self, complexity: float) -> str:
         """Determine severity based on complexity value.

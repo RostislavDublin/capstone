@@ -200,6 +200,72 @@ from vertexai.preview import rag  # WRONG - deprecated, forbidden!
 - Use `tests/fixtures/test-app/` as sample repo
 - Generate new diffs: `from scripts.generate_demo_diff import generate_diff`
 
+## ADK Runner Configuration
+
+**CRITICAL:** Always use correct `app_name` in InMemoryRunner to avoid warnings.
+
+```python
+# CORRECT - matches ADK agent loading path
+runner = InMemoryRunner(agent=my_agent, app_name="agents")
+
+# WRONG - causes "app name mismatch" warning
+runner = InMemoryRunner(agent=my_agent, app_name="quality_guardian")
+```
+
+**Why:** ADK determines expected app_name from the path where agent is loaded. Since agents import from `google.adk.agents`, ADK expects `app_name="agents"`. Using a different name causes warnings about mismatch.
+
+**Rule:** Always set `app_name="agents"` for all InMemoryRunner instances in this project.
+
+## Test Fixture Quality Patterns
+
+**CRITICAL FOR UNDERSTANDING TESTS AND DEMOS**
+
+Our test fixture repository (`RostislavDublin/quality-guardian-test-fixture`) contains **16 commits with intentional quality patterns**. These are **NOT random** - they simulate realistic development cycles.
+
+**Full Documentation:** `tests/fixtures/QUALITY_PATTERNS.md`
+
+### Quick Reference - Quality Lifecycle
+
+```
+Phase 1: IMPROVING (commits 1-5)     → 82.6 to 86.8 (+4.2)
+  Initial development, security fixes
+
+Phase 2: REGRESSION (commits 5-7)    → 86.8 to 83.8 (-3.0)
+  Removed validation, unsafe features
+
+Phase 3: RECOVERY (commits 7-9)      → 83.8 to ~89 (+5)
+  Security fixes BUT eval() remains (blocks full recovery)
+
+Phase 4: PLATEAU (commits 9-11)      → ~89 to ~90 (flat)
+  New features added but eval() prevents quality growth
+  KEY INSIGHT: Features don't improve quality when vulnerabilities exist
+
+Phase 5: SPIKE UP (commit 12)        → 90 to ~93 (+3)
+  Remove eval() → sharp quality improvement
+
+Phase 6: PEAK (commit 13)            → ~93 to ~95 (+2)
+  Add authentication on clean codebase
+
+Phase 7: FINAL REGRESSION (14-15)    → 95 to 80.8 (-14)
+  Rushed features, disabled logging
+```
+
+### Why This Matters
+
+1. **Quality scores are GENERATED** by Guardian agent analyzing real code
+2. **Patterns test agent capabilities**: IMPROVING, REGRESSION, RECOVERY, SPIKE, PLATEAU
+3. **eval() is intentional**: Demonstrates how critical vulnerabilities block quality improvements
+4. **Fixture represents reality**: Technical debt, deadline pressure, remediation efforts
+
+### When Working with Tests/Demos
+
+- **Understand the patterns** before modifying fixture commits
+- **Changing commit code** → quality scores change (not hardcoded!)
+- **Tests expect patterns** - don't break them accidentally
+- **Demos demonstrate detection** - not just reporting numbers
+
+**For auditors:** This fixture proves we understand causal relationships between code changes and quality metrics.
+
 ## Remember
 
 1. **NEVER commit without "commit" command from user**
@@ -209,3 +275,5 @@ from vertexai.preview import rag  # WRONG - deprecated, forbidden!
 5. Use fixtures for consistency
 6. Check project-plan.md for current phase
 7. Run tests before claiming done
+8. **Always use `app_name="agents"` in InMemoryRunner**
+9. **Read `tests/fixtures/QUALITY_PATTERNS.md` before changing fixtures**

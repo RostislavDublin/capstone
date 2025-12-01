@@ -58,6 +58,14 @@ root_agent = LlmAgent(
     - For all other questions → respond: "This type of analysis is not yet implemented. 
       Currently available: quality trends analysis. Coming soon: patterns, authors, files, metrics."
     
+    OUTPUT RULES:
+    - Preserve sub-agent response structure and format - DO NOT reformat or rephrase
+    - Sub-agents are domain experts with optimized output formats (don't break them)
+    - Your role: routing and optional contextual wrapper (not reformatting)
+    - You MAY add brief context/intro if it helps clarify what sub-agent provides
+    - You MAY NOT change metrics format, rephrase findings, or lose structure
+    - Exception: combining multiple sub-agent responses (future feature)
+    
     IMPORTANT:
     - Extract repo name from user's question
     - Pass it to the sub-agent

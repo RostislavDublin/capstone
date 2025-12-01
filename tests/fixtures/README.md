@@ -2,28 +2,44 @@
 
 This directory contains all test fixtures used by unit tests, integration tests, and demo scripts.
 
+## 📖 Critical Documentation
+
+**[QUALITY_PATTERNS.md](QUALITY_PATTERNS.md)** - **READ THIS FIRST**
+
+Explains the intentional quality patterns in our test repository. Essential for understanding:
+- Why quality scores follow specific patterns (IMPROVING → REGRESSION → RECOVERY → SPIKE → REGRESSION)
+- How commit content affects quality scores
+- What patterns we're testing the agents to detect
+- Why fixtures are designed this way (not random!)
+
 ## Structure
 
 ```
 tests/fixtures/
 ├── README.md              # This file
-├── _generate_diffs.py     # Helper script to regenerate git diffs
-├── changesets.py          # Python code samples for testing
-├── mock_pr.py             # Mock Pull Request objects
-├── test-app/              # Sample Flask application with intentional issues
+├── QUALITY_PATTERNS.md    # 🔥 Intentional quality patterns (READ THIS)
+├── README_FIXTURES.md     # Additional fixture documentation
+├── fast_reset_api.py      # Creates GitHub commits via API
+├── test_repo_fixture.py   # Fixture management utilities
+├── commits/               # 15 fixture commits with quality patterns
+│   ├── commit_01_add_logging.py
+│   ├── commit_02_fix_sql_injection.py
+│   ├── ...                # See QUALITY_PATTERNS.md for details
+│   └── commit_15_disable_logging.py
+├── test-app/              # Base Flask application template
 │   ├── app/
 │   │   ├── __init__.py
 │   │   ├── config.py
-│   │   ├── database.py    # Contains SQL injection vulnerabilities
+│   │   ├── database.py
 │   │   ├── main.py
 │   │   └── utils.py
 │   ├── tests/
 │   │   └── test_app.py
 │   ├── README.md
 │   └── requirements.txt
-└── diffs/                 # Git diff fixtures
-    ├── basic_pr.diff      # Simple PR with SQL injection
-    └── complex_pr.diff    # Complex PR with SQL injection + high complexity
+└── diffs/                 # Git diff fixtures (deprecated)
+    ├── basic_pr.diff
+    └── complex_pr.diff
 ```
 
 ## test-app/
