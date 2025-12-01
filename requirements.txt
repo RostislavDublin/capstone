@@ -4,11 +4,7 @@
 # ADK brings most dependencies (google-genai, vertexai, google-cloud-aiplatform, etc.)
 google-adk
 
-# Quality Guardian dependencies packaged as wheel
-# Contains tools/, storage/, lib/, connectors/ modules
-./quality_guardian_deps-0.1.0-py3-none-any.whl
-
-# Additional dependencies (already in wheel but listed for clarity)
+# Additional dependencies
 PyGithub>=2.1.1
 python-dotenv>=1.0.0
 unidiff>=0.7.5
