@@ -310,11 +310,69 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 # Install dependencies
 pip install -e .
 pip install -r requirements/dev.txt
-
-# Configure Google Cloud
-export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
-export PROJECT_ID="your-gcp-project-id"
 ```
+
+### Configuration
+
+1. **Copy environment template:**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Edit `.env` with your values:**
+   ```bash
+   GITHUB_TOKEN="your-github-token"                  # From https://github.com/settings/tokens
+   GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
+   GOOGLE_APPLICATION_CREDENTIALS="./service-account-key.json"
+   FIRESTORE_DATABASE="(default)"
+   FIRESTORE_COLLECTION_PREFIX="dev"
+   ```
+
+3. **Place service account key:**
+   ```bash
+   # Download from GCP Console → IAM & Admin → Service Accounts
+   cp ~/Downloads/key.json ./service-account-key.json
+   ```
+
+See [`.env.example`](.env.example) for all available options.
+
+### Interactive Testing with ADK Web
+
+**Launch ADK Web Interface:**
+```bash
+adk web src/agents/
+```
+
+This opens a web UI at `http://localhost:8000` where you can:
+1. Select an agent from the list (quality_guardian, query_orchestrator, etc.)
+2. Interact with the agent through a chat interface
+3. See real-time tool calls, agent transfers, and responses
+4. Test different scenarios interactively
+
+**Example Test Queries:**
+
+**For quality_guardian (full system):**
+- `"Bootstrap RostislavDublin/quality-guardian-test-fixture and analyze the last 10 commits"`
+- `"Check for new commits in RostislavDublin/quality-guardian-test-fixture"`
+- `"Show quality trends for RostislavDublin/quality-guardian-test-fixture"`
+- `"Why did quality drop in RostislavDublin/quality-guardian-test-fixture in the last 2 weeks?"`
+- `"Show trends and explain root causes for quality degradation"`
+
+**For query_orchestrator (query routing):**
+- `"Show quality trends for the repository"`
+- `"Explain why quality degraded"`
+- `"Show trends AND explain root causes"` (composite query)
+
+**What to observe:**
+- ✅ Agent routing (quality_guardian → sub-agents)
+- ✅ Tool calls (GitHub API, Firestore queries, RAG search)
+- ✅ Parallel execution (composite queries)
+- ✅ Response merging (orchestrator combining outputs)
+- ✅ RAG grounding (citations with commit SHAs)
+
+**Stop server:** Press `Ctrl+C` in terminal
+
+---
 
 ### Run Demos
 
@@ -356,6 +414,44 @@ pytest tests/integration/ -v
 ```
 
 **Test results:** 114 passed (11 integration, 103 unit)
+
+---
+
+### Production Deployment
+
+Deploy Quality Guardian to Vertex AI Agent Engine for production use.
+
+**Quick Deploy:**
+
+```bash
+cd deployment/
+
+# 1. Configure
+cp .env.example .env
+# Edit .env with your GCP project ID
+
+# 2. Deploy
+python deploy.py
+
+# 3. Test
+python test_deployed_agent.py
+
+# 4. Cleanup (when done)
+python undeploy.py
+```
+
+**Requirements:**
+- Google Cloud Project with billing enabled
+- Service Account with Vertex AI permissions
+- ADK CLI installed (`pip install google-adk`)
+
+**Features:**
+- ✅ Auto-scaling (scales to zero when idle)
+- ✅ Managed infrastructure (Cloud Run + Agent Engine)
+- ✅ Built-in telemetry and monitoring
+- ✅ One-command deployment via ADK CLI
+
+**Full documentation:** See `deployment/README.md`
 
 ---
 
@@ -678,6 +774,20 @@ Not a prototype. 114 tests, comprehensive error handling, structured logging, de
 
 ### 5. Real Engineering Problem
 Not a toy example. Solves actual pain point: quality monitoring for engineering teams. Judges will recognize the value.
+
+---
+
+## 🚀 Deployment
+
+Deploy Quality Guardian to Vertex AI Agent Engine:
+
+```bash
+python deployment/deploy.py
+```
+
+**Key Achievement**: Solved multi-module agent deployment challenge using `agent_engines.create()` API with relative path technique. Enables deployment of complex multi-agent systems with shared modules.
+
+See detailed guide: [deployment/README.md](deployment/README.md)
 
 ---
 

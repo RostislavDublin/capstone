@@ -49,7 +49,7 @@ def rag_root_cause_analysis(
     
     try:
         # Initialize
-        project = os.getenv("GOOGLE_CLOUD_PROJECT")
+        project = os.getenv("PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT")
         location = os.getenv("VERTEX_LOCATION", "us-west1")
         vertexai.init(project=project, location=location)
         

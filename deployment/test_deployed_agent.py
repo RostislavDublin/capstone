@@ -1,4 +1,4 @@
-"""Check deployed Agent Engine status."""
+"""Test deployed Agent Engine with sample queries."""
 
 import os
 import sys
@@ -28,8 +28,8 @@ def load_config() -> Dict[str, Any]:
     return config
 
 
-def check_agents():
-    """List all deployed agents in configured region."""
+async def test_agent():
+    """Send test queries to deployed agent."""
     config = load_config()
     if not config:
         return
@@ -44,7 +44,7 @@ def check_agents():
     project_id = config.get('GOOGLE_CLOUD_PROJECT')
     region = config.get('DEPLOYMENT_REGION', 'us-central1')
     
-    print(f"🔍 Checking deployed agents...")
+    print(f"🔍 Connecting to deployed agent...")
     print(f"   Project: {project_id}")
     print(f"   Region: {region}\n")
     
@@ -53,24 +53,48 @@ def check_agents():
         
         agents = list(agent_engines.list())
         
-        if agents:
-            print(f"✅ Found {len(agents)} deployed agent(s):\n")
-            for i, agent in enumerate(agents, 1):
-                print(f"  {i}. {agent.display_name if hasattr(agent, 'display_name') else 'quality_guardian'}")
-                print(f"     Resource: {agent.resource_name}")
-                print(f"     Created: {agent.create_time}")
-                print()
-        else:
-            print(f"❌ No agents found in {region}")
+        if not agents:
+            print("❌ No agents found")
             print("   Deploy with: python deploy.py")
+            return
+        
+        agent = agents[0]  # Use first agent
+        print(f"✅ Connected to: {agent.resource_name}\n")
+        
+        # Test queries
+        test_queries = [
+            "Bootstrap RostislavDublin/quality-guardian-test-fixture and analyze the last 10 commits",
+            "Show quality trends for RostislavDublin/quality-guardian-test-fixture",
+            "Why did quality drop in RostislavDublin/quality-guardian-test-fixture?"
+        ]
+        
+        for i, query in enumerate(test_queries, 1):
+            print(f"{'='*80}")
+            print(f"Test {i}/{len(test_queries)}: {query}")
+            print(f"{'='*80}\n")
             
+            try:
+                async for item in agent.async_stream_query(
+                    message=query,
+                    user_id="test_user"
+                ):
+                    print(item)
+                
+                print("\n")
+                
+            except Exception as e:
+                print(f"❌ Query failed: {e}\n")
+        
+        print("✅ Testing complete")
+        
     except Exception as e:
         print(f"❌ Error: {e}")
         print("\nTroubleshooting:")
         print("  1. Check GOOGLE_APPLICATION_CREDENTIALS is set")
         print("  2. Verify service account has 'Vertex AI User' role")
-        print("  3. Ensure Vertex AI API is enabled")
+        print("  3. Ensure agent is deployed: python check_agent.py")
 
 
 if __name__ == '__main__':
-    check_agents()
+    import asyncio
+    asyncio.run(test_agent())

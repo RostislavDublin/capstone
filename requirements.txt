@@ -1,0 +1,17 @@
+# Production Requirements for Agent Engine Deployment
+# This file is used by ADK during `adk deploy agent_engine`
+
+# ADK brings most dependencies (google-genai, vertexai, google-cloud-aiplatform, etc.)
+google-adk
+
+# Quality Guardian dependencies packaged as wheel
+# Contains tools/, storage/, lib/, connectors/ modules
+./quality_guardian_deps-0.1.0-py3-none-any.whl
+
+# Additional dependencies (already in wheel but listed for clarity)
+PyGithub>=2.1.1
+python-dotenv>=1.0.0
+unidiff>=0.7.5
+radon>=6.0.1
+bandit>=1.7.5
+google-cloud-firestore>=2.14.0

@@ -176,9 +176,9 @@ def query_trends(
         from storage.firestore_client import FirestoreAuditDB
         
         # Initialize Firestore
-        project = os.getenv("GOOGLE_CLOUD_PROJECT")
+        project = os.getenv("PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT")
         if not project:
-            return {"error": "Missing GOOGLE_CLOUD_PROJECT"}
+            return {"error": "Missing PROJECT_ID or GOOGLE_CLOUD_PROJECT"}
         
         db = FirestoreAuditDB(
             project_id=project,

@@ -1,7 +1,11 @@
 # Environment files with secrets
 .env
 .env.deploy
+.env.production
 service-account-key.json
+
+# Agent Engine config (may contain resource limits)
+.agent_engine_config.json
 
 # Python
 __pycache__/

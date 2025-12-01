@@ -26,9 +26,10 @@ def _get_rag_tool():
     # Suppress deprecation warning - Vertex RAG not yet in google.genai SDK
     warnings.filterwarnings('ignore', message='.*deprecated.*', category=UserWarning)
     
-    project = os.getenv("GOOGLE_CLOUD_PROJECT")
+    # Get project from env (PROJECT_ID works in Agent Engine, GOOGLE_CLOUD_PROJECT locally)
+    project = os.getenv("PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT")
     if not project:
-        raise ValueError("Missing GOOGLE_CLOUD_PROJECT")
+        raise ValueError("Missing PROJECT_ID or GOOGLE_CLOUD_PROJECT")
     
     location = os.getenv("VERTEX_LOCATION", "us-west1")
     vertexai.init(project=project, location=location)
@@ -78,7 +79,7 @@ def analyze_repository(repo: str, count: int = 10) -> dict:
         
         # Get credentials
         token = os.getenv("GITHUB_TOKEN")
-        project = os.getenv("GOOGLE_CLOUD_PROJECT")
+        project = os.getenv("PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT")
         
         if not token or not project:
             return {
@@ -195,7 +196,7 @@ def check_new_commits(repo: str) -> dict:
         import vertexai
         
         token = os.getenv("GITHUB_TOKEN")
-        project = os.getenv("GOOGLE_CLOUD_PROJECT")
+        project = os.getenv("PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT")
         
         if not token or not project:
             return {"error": "Missing credentials"}
@@ -315,7 +316,7 @@ def query_trends(repo: str, question: str) -> dict:
         warnings.filterwarnings('ignore', message='.*deprecated.*', category=UserWarning)
         
         # Initialize
-        project = os.getenv("GOOGLE_CLOUD_PROJECT")
+        project = os.getenv("PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT")
         location = os.getenv("VERTEX_LOCATION", "us-west1")
         vertexai.init(project=project, location=location)
         
@@ -445,9 +446,10 @@ def list_analyzed_repositories() -> dict:
         from storage.firestore_client import FirestoreAuditDB
         import vertexai
         
-        project = os.getenv("GOOGLE_CLOUD_PROJECT")
+        # Get project from env (PROJECT_ID works in Agent Engine, GOOGLE_CLOUD_PROJECT locally)
+        project = os.getenv("PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT")
         if not project:
-            return {"error": "Missing GOOGLE_CLOUD_PROJECT"}
+            return {"error": "Missing PROJECT_ID or GOOGLE_CLOUD_PROJECT"}
         
         location = os.getenv("VERTEX_LOCATION", "us-west1")
         vertexai.init(project=project, location=location)
