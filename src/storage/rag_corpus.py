@@ -10,7 +10,7 @@ import os
 import tempfile
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import vertexai
 from vertexai import rag
@@ -103,6 +103,14 @@ class RAGCorpusManager:
             return self._corpus
         except Exception as e:
             raise RuntimeError(f"Failed to create corpus '{self.corpus_name}': {e}") from e
+
+    def get_or_create_corpus(self) -> rag.RagCorpus:
+        """Alias for initialize_corpus() - more intuitive name.
+        
+        Returns:
+            RagCorpus instance
+        """
+        return self.initialize_corpus()
 
     def store_commit_audit(
         self,
@@ -565,6 +573,126 @@ class RAGCorpusManager:
         
         logger.warning(f"File not indexed after {max_attempts} attempts")
         return False
+
+    def retrieval_query(
+        self,
+        text: str,
+        top_k: int = 10,
+        filter_string: Optional[str] = None,
+        vector_distance_threshold: Optional[float] = None,
+    ) -> List[Dict[str, Any]]:
+        """Advanced retrieval query with filtering support.
+        
+        This method wraps vertexai.rag.retrieval_query() with enhanced result parsing.
+        Supports metadata filtering for precise semantic search.
+        
+        Args:
+            text: Natural language query for semantic search
+            top_k: Number of results to return (1-50, default 10)
+            filter_string: Optional metadata filter (e.g., 'repo = "owner/repo" AND quality_score < 80')
+            vector_distance_threshold: Optional similarity threshold (0.0-1.0, lower = more similar)
+        
+        Filter String Examples:
+            - 'repo = "facebook/react"'
+            - 'date >= "2025-10-01T00:00:00Z" AND quality_score < 75'
+            - 'author = "Alice" AND critical_issues > 0'
+        
+        Returns:
+            List of dicts with:
+            - text: Retrieved document text
+            - distance: Vector distance (lower = more relevant)
+            - source_uri: File URI in RAG corpus
+            - metadata: Extracted metadata (repo, sha, quality_score, etc.)
+            - audit_data: Parsed CommitAudit data if available
+            - relevance_score: Normalized score (1.0 = perfect match, 0.0 = irrelevant)
+        
+        Example:
+            >>> results = manager.retrieval_query(
+            ...     text="SQL injection vulnerabilities",
+            ...     top_k=10,
+            ...     filter_string='repo = "myorg/backend" AND quality_score < 80'
+            ... )
+            >>> for result in results:
+            ...     print(f"{result['metadata']['sha'][:7]}: {result['relevance_score']:.2f}")
+        
+        Raises:
+            RuntimeError: If corpus not initialized or query fails
+        """
+        if self._corpus_resource_name is None:
+            raise RuntimeError("Corpus not initialized. Call get_or_create_corpus() first.")
+        
+        try:
+            # Build retrieval config
+            filter_obj = None
+            if filter_string:
+                filter_obj = rag.Filter(vector_distance_threshold=vector_distance_threshold)
+                filter_obj.filter = filter_string
+            elif vector_distance_threshold:
+                filter_obj = rag.Filter(vector_distance_threshold=vector_distance_threshold)
+            
+            retrieval_config = rag.RagRetrievalConfig(
+                top_k=min(top_k, 50),  # Cap at 50
+                filter=filter_obj,
+            )
+            
+            logger.info(f"RAG query: '{text[:50]}...' (top_k={top_k}, filter={bool(filter_string)})")
+            
+            # Execute query
+            response = rag.retrieval_query(
+                text=text,
+                rag_resources=[rag.RagResource(rag_corpus=self._corpus_resource_name)],
+                rag_retrieval_config=retrieval_config,
+            )
+            
+            # Parse results
+            results = []
+            if hasattr(response, "contexts") and response.contexts:
+                for context in response.contexts.contexts:
+                    # Extract text chunk and distance
+                    result = {
+                        "text": context.text,
+                        "distance": getattr(context, "distance", None),
+                        "source_uri": getattr(context.source, "uri", None) if hasattr(context, "source") else None,
+                        "metadata": {},
+                        "audit_data": {},
+                        "relevance_score": 0.0,
+                    }
+                    
+                    # Calculate relevance score (inverse of distance, normalized)
+                    if result["distance"] is not None:
+                        # Distance typically 0.0-2.0, convert to 0.0-1.0 relevance
+                        result["relevance_score"] = max(0.0, 1.0 - (result["distance"] / 2.0))
+                    
+                    # Extract metadata from RAG file metadata (NOT from text!)
+                    # RAG stores metadata at file level, not chunk level
+                    if hasattr(context, "source") and hasattr(context.source, "metadata"):
+                        source_metadata = context.source.metadata
+                        result["metadata"] = {
+                            "sha": getattr(source_metadata, "commit_sha", None),
+                            "repo": getattr(source_metadata, "repo", None),
+                            "date": getattr(source_metadata, "date", None),
+                            "author": getattr(source_metadata, "author", None),
+                            "quality_score": getattr(source_metadata, "quality_score", None),
+                            "security_score": getattr(source_metadata, "security_score", None),
+                            "critical_issues": getattr(source_metadata, "critical_issues", 0),
+                            "total_issues": getattr(source_metadata, "total_issues", 0),
+                        }
+                    
+                    # Try to get full audit data from source file if possible
+                    # For now, text chunk is what we have
+                    result["audit_data"] = {
+                        "text_chunk": context.text,
+                        # Full audit would need to be retrieved from Firestore using sha
+                    }
+                    
+                    results.append(result)
+            
+            logger.info(f"✅ RAG retrieval returned {len(results)} results")
+            return results
+        
+        except Exception as e:
+            logger.error(f"❌ RAG retrieval_query failed: {e}", exc_info=True)
+            raise RuntimeError(f"RAG query failed: {e}") from e
 
 
 

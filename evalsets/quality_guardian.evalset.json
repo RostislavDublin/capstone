@@ -1,0 +1,56 @@
+{
+  "eval_set_id": "quality_guardian_tests",
+  "eval_cases": [
+    {
+      "eval_id": "trends_only",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Show quality trends for RostislavDublin/quality-guardian-test-fixture"}]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "query_agent"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "root_cause_only",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Why did quality drop in RostislavDublin/quality-guardian-test-fixture in the last 2 weeks?"}]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "query_agent"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "composite_query",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Show me the quality trends for RostislavDublin/quality-guardian-test-fixture and explain what caused any quality degradation"}]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "query_agent"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 """Root Agent - Quality Guardian Orchestrator.
 
-Orchestrates specialized sub-agents via ADK AgentTool composition.
+Coordinates specialized sub-agents via LLM-Driven Delegation (transfer_to_agent).
+Implements Coordinator/Dispatcher pattern from ADK documentation.
 """
 import logging
 import sys
@@ -13,13 +14,12 @@ if str(src_path) not in sys.path:
 
 from google.adk.agents import LlmAgent
 from google.adk.models.google_llm import Gemini
-from google.adk.tools.agent_tool import AgentTool
 from google.genai import types
 
 # Import sub-agents from sibling directories
 from agents.bootstrap.agent import root_agent as bootstrap_agent
 from agents.sync.agent import root_agent as sync_agent
-from agents.query_orchestrator.agent import root_agent as query_agent  # NEW: orchestrator
+from agents.query_orchestrator.agent import root_agent as query_agent
 
 logger = logging.getLogger(__name__)
 
@@ -36,42 +36,31 @@ root_agent = LlmAgent(
     model=Gemini(model="gemini-2.0-flash-001", retry_options=retry_config),
     description="AI agent that monitors code quality trends across GitHub repositories",
     instruction="""
-    You are Quality Guardian, an AI assistant for monitoring code quality.
+    You are Quality Guardian, a coordinator for code quality monitoring.
     
-    You have three specialist agents:
+    You have three specialized sub-agents:
     1. bootstrap_agent - Analyze a repository for the first time (initial analysis)
     2. sync_agent - Check for new commits since last analysis
     3. query_agent - Answer questions about quality trends AND list analyzed repositories
     
-    Routing rules (check user's keywords):
-    - "Bootstrap X" or "Analyze X" or "Audit X" → delegate to bootstrap_agent
-    - "Sync X" or "Check X for updates" or "New commits in X" → delegate to sync_agent
-    - "Trends" or "Quality of X" or "Issues in X" → delegate to query_agent
-    - "What repos" or "Which repositories" or "List repos" → delegate to query_agent
+    Routing rules (analyze user's request and transfer):
+    - "Bootstrap X" or "Analyze X" or "Audit X" → transfer to bootstrap_agent
+    - "Sync X" or "Check X for updates" or "New commits in X" → transfer to sync_agent
+    - "Trends" or "Quality of X" or "Issues in X" or "Why" → transfer to query_agent
+    - "What repos" or "Which repositories" or "List repos" → transfer to query_agent
     
-    IMPORTANT: 
-    - "Bootstrap" means initial analysis (can be run multiple times on same repo)
-    - query_agent can list ALL analyzed repositories (no repo parameter needed)
-    - When delegating to bootstrap_agent, preserve ALL parameters from user's request
-    
-    OUTPUT RULES:
-    - Preserve sub-agent response structure and format - DO NOT reformat or rephrase
-    - Sub-agents provide optimized, structured output (don't break it)
-    - Your role: routing and optional contextual wrapper (not reformatting)
-    - You MAY add brief context/intro if it helps user understanding
-    - You MAY NOT change metrics format, rephrase findings, or lose structure
+    CRITICAL: You are a DISPATCHER, not an executor.
+    - Your job: Identify which sub-agent should handle the request
+    - Then: Use transfer_to_agent() to route the request
+    - The sub-agent will respond DIRECTLY to the user
+    - You do NOT need to see or process the sub-agent's response
     
     Always use proper repository format: owner/repo (e.g., 'facebook/react')
-    Provide clear, actionable insights about code quality.
     """,
-    tools=[
-        AgentTool(agent=bootstrap_agent),
-        AgentTool(agent=sync_agent),
-        AgentTool(agent=query_agent)
-    ]
+    sub_agents=[bootstrap_agent, sync_agent, query_agent],
 )
 
-logger.info("✅ Quality Guardian Agent initialized (Multi-Agent Composition)")
+logger.info("✅ Quality Guardian Agent initialized (Coordinator/Dispatcher)")
 logger.info("   Root: quality_guardian → 3 sub-agents")
 logger.info("   Sub-agents: bootstrap_agent, sync_agent, query_agent")
-logger.info("   Pattern: ADK AgentTool composition (from reference notebooks)")
+logger.info("   Pattern: LLM-Driven Delegation (transfer_to_agent)")

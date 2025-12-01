@@ -17,10 +17,14 @@ def _get_rag_tool():
     Returns:
         tuple: (rag_manager, rag_tool, stats)
     """
+    import warnings
     from storage.rag_corpus import RAGCorpusManager
     from vertexai.generative_models import Tool
     from vertexai import rag
     import vertexai
+    
+    # Suppress deprecation warning - Vertex RAG not yet in google.genai SDK
+    warnings.filterwarnings('ignore', message='.*deprecated.*', category=UserWarning)
     
     project = os.getenv("GOOGLE_CLOUD_PROJECT")
     if not project:
@@ -33,7 +37,7 @@ def _get_rag_tool():
     # Get corpus stats
     stats = rag_mgr.get_corpus_stats()
     
-    # Create RAG retrieval tool
+    # Create RAG retrieval tool - Tool.from_retrieval is ONLY way for Vertex RAG
     rag_tool = Tool.from_retrieval(
         retrieval=rag.Retrieval(
             source=rag.VertexRagStore(
@@ -42,7 +46,6 @@ def _get_rag_tool():
                         rag_corpus=rag_mgr._corpus_resource_name,
                     )
                 ],
-                similarity_top_k=50,  # More results for better coverage
             ),
         )
     )
@@ -296,9 +299,13 @@ def query_trends(repo: str, question: str) -> dict:
         AI-generated analysis with commit data from Firestore
     """
     try:
+        import warnings
         from vertexai.generative_models import GenerativeModel
         from storage.firestore_client import FirestoreAuditDB
         import vertexai
+        
+        # Suppress deprecation warning - Vertex RAG not yet in google.genai
+        warnings.filterwarnings('ignore', message='.*deprecated.*', category=UserWarning)
         
         # Initialize
         project = os.getenv("GOOGLE_CLOUD_PROJECT")
@@ -390,7 +397,7 @@ Specific, actionable steps to improve code quality, referencing commits and file
 
 Use RAG corpus to get detailed information about specific issues, files, and code patterns."""
         
-        # Use RAG tool for semantic details
+        # Use GenerativeModel with RAG grounding
         model = GenerativeModel(
             model_name="gemini-2.0-flash-001",
             tools=[rag_tool],

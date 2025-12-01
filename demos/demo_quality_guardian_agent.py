@@ -36,7 +36,6 @@ sys.path.insert(0, str(src_path))
 
 from agents.quality_guardian.agent import root_agent
 
-# Import ADK runner (proper pattern from reference notebooks)
 from google.adk.runners import InMemoryRunner
 
 # Import test repo fixture
@@ -124,8 +123,8 @@ async def demo_natural_language_commands():
     # Get test repo name
     test_repo = get_test_repo_name()
     
-    # Create runner (proper ADK pattern from reference notebooks)
-    runner = InMemoryRunner(agent=root_agent, app_name="quality_guardian")
+    # Create runner
+    runner = InMemoryRunner(agent=root_agent, app_name="agents")
     print("✅ Agent runner ready (ADK)\n")
     
     # SETUP 1: Reset to 13 fixture commits for bootstrap
@@ -247,9 +246,9 @@ def demo_agent_composition():
     print_section("🤖 ADK MULTI-AGENT COMPOSITION")
     
     print("This demo shows proper ADK architecture:")
-    print("  ✓ Root agent → orchestrates 3 sub-agents")
+    print("  ✓ Root agent → coordinates 3 sub-agents")
     print("  ✓ Sub-agents: bootstrap_agent, sync_agent, query_agent")
-    print("  ✓ Composition via AgentTool (from reference notebooks)")
+    print("  ✓ Coordinator/Dispatcher pattern (transfer_to_agent)")
     print("  ✓ Tool functions with backend logic inside (not module-level)")
     print()
     

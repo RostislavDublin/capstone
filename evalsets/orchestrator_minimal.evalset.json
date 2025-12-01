@@ -1,0 +1,22 @@
+{
+  "eval_set_id": "orchestrator_minimal",
+  "eval_cases": [
+    {
+      "eval_id": "root_cause_only",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Why did quality drop in RostislavDublin/quality-guardian-test-fixture in the last 2 weeks?"}]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "root_cause_agent"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

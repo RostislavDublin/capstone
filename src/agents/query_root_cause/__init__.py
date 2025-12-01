@@ -1,5 +1,4 @@
-"""query agent for ADK web."""
-
+"""Query Root Cause Agent package."""
 from .agent import root_agent
 
 __all__ = ["root_agent"]
