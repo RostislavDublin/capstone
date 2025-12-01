@@ -70,6 +70,10 @@ class FirestoreAuditDB:
         repo_id = self._get_repo_id(audit.repository)
         repo_ref = self.client.collection(self.repositories_collection).document(repo_id)
         
+        # Check if commit already exists
+        commit_ref = repo_ref.collection("commits").document(audit.commit_sha)
+        commit_exists = commit_ref.get().exists
+        
         # Get or create repository document
         repo_doc = repo_ref.get()
         now = firestore.SERVER_TIMESTAMP
@@ -85,18 +89,19 @@ class FirestoreAuditDB:
             logger.info(f"Created repository document: {audit.repository}")
         else:
             # Update existing repository document
-            repo_ref.update({
-                "total_commits": firestore.Increment(1),
-                "last_analyzed": now,
-            })
+            # Only increment total_commits if this is a NEW commit
+            update_data = {"last_analyzed": now}
+            if not commit_exists:
+                update_data["total_commits"] = firestore.Increment(1)
+            repo_ref.update(update_data)
         
-        # Store commit in subcollection
-        commit_ref = repo_ref.collection("commits").document(audit.commit_sha)
+        # Store commit in subcollection (overwrites if exists)
         commit_data = audit.model_dump()
         
         # Firestore handles datetime objects natively, no conversion needed
         commit_ref.set(commit_data)
-        logger.info(f"Stored commit audit: {audit.repository}@{audit.commit_sha[:7]}")
+        action = "Updated" if commit_exists else "Stored"
+        logger.info(f"{action} commit audit: {audit.repository}@{audit.commit_sha[:7]}")
     
     def get_repositories(self) -> List[str]:
         """Get list of all analyzed repositories.
