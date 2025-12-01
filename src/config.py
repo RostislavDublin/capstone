@@ -50,10 +50,8 @@ class FirestoreConfig(BaseModel):
 class TestFixtureConfig(BaseModel):
     """Test fixture repository configuration."""
     remote_repo: str = Field(
-        default_factory=lambda: os.getenv(
-            "TEST_FIXTURE_REPO", 
-            "RostislavDublin/quality-guardian-test-fixture"
-        ),
+        default_factory=lambda: os.getenv("TEST_FIXTURE_REPO") or 
+            f"{os.getenv('TEST_REPO_OWNER', 'RostislavDublin')}/{os.getenv('TEST_REPO_NAME', 'quality-guardian-test-fixture')}",
         description="Remote GitHub repository for test fixture"
     )
     local_path: str = Field(

@@ -182,8 +182,8 @@ def query_trends(
         
         db = FirestoreAuditDB(
             project_id=project,
-            database="(default)",
-            collection_prefix="quality-guardian"
+            database=os.getenv("FIRESTORE_DATABASE", "(default)"),
+            collection_prefix=os.getenv("FIRESTORE_COLLECTION_PREFIX", "quality-guardian")
         )
         
         # Check if repo exists

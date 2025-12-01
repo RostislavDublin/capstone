@@ -36,7 +36,7 @@ python demos/demo_quality_guardian_agent.py 1
 **Requirements:**
 - GitHub token: `GITHUB_TOKEN` in `.env.dev`
 - Google Cloud project: `GOOGLE_CLOUD_PROJECT`
-- Test repository: `RostislavDublin/capstone-test-fixture`
+- Test repository: Set `TEST_REPO_NAME` in `.env` (default: `quality-guardian-test-fixture`)
 
 **Example output:**
 ```
@@ -149,5 +149,4 @@ if __name__ == "__main__":
 ## See Also
 
 - `tests/` - automated tests (pytest)
-- `scripts/` - development and deployment utilities
-- `docs/testing-strategy.md` - testing strategy
+- `deployment/` - deployment scripts and configuration

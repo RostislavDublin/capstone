@@ -85,8 +85,8 @@ def clean_all_storage():
         # Clean Firestore
         db = FirestoreAuditDB(
             project_id=project,
-            database="(default)",
-            collection_prefix="quality-guardian"
+            database=os.getenv("FIRESTORE_DATABASE", "(default)"),
+            collection_prefix=os.getenv("FIRESTORE_COLLECTION_PREFIX", "quality-guardian")
         )
         repos = db.get_repositories()
         for repo in repos:
@@ -147,12 +147,13 @@ async def demo_natural_language_commands():
     from storage.rag_corpus import RAGCorpusManager
     
     project = os.getenv("GOOGLE_CLOUD_PROJECT")
-    vertexai.init(project=project, location="us-west1")
+    location = os.getenv("VERTEX_LOCATION", "us-west1")
+    vertexai.init(project=project, location=location)
     
     db = FirestoreAuditDB(
         project_id=project,
-        database="(default)",
-        collection_prefix="quality-guardian"
+        database=os.getenv("FIRESTORE_DATABASE", "(default)"),
+        collection_prefix=os.getenv("FIRESTORE_COLLECTION_PREFIX", "quality-guardian")
     )
     
     # Test 1: Bootstrap with 14 commits (initial + 13 fixtures)

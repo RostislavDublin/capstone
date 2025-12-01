@@ -30,7 +30,8 @@ def _get_rag_tool():
     if not project:
         raise ValueError("Missing GOOGLE_CLOUD_PROJECT")
     
-    vertexai.init(project=project, location="us-west1")
+    location = os.getenv("VERTEX_LOCATION", "us-west1")
+    vertexai.init(project=project, location=location)
     rag_mgr = RAGCorpusManager(corpus_name="quality-guardian-audits")
     rag_mgr.initialize_corpus()
     
@@ -86,7 +87,8 @@ def analyze_repository(repo: str, count: int = 10) -> dict:
             }
         
         # Initialize
-        vertexai.init(project=project, location="us-west1")
+        location = os.getenv("VERTEX_LOCATION", "us-west1")
+        vertexai.init(project=project, location=location)
         
         # Use GitHub tool to get commits
         commits_result = list_github_commits(repository=repo, count=count)
@@ -126,8 +128,8 @@ def analyze_repository(repo: str, count: int = 10) -> dict:
         from storage.firestore_client import FirestoreAuditDB
         firestore_db = FirestoreAuditDB(
             project_id=project,
-            database="(default)",
-            collection_prefix="quality-guardian"
+            database=os.getenv("FIRESTORE_DATABASE", "(default)"),
+            collection_prefix=os.getenv("FIRESTORE_COLLECTION_PREFIX", "quality-guardian")
         )
         
         # Analyze commits
@@ -198,7 +200,8 @@ def check_new_commits(repo: str) -> dict:
         if not token or not project:
             return {"error": "Missing credentials"}
         
-        vertexai.init(project=project, location="us-west1")
+        location = os.getenv("VERTEX_LOCATION", "us-west1")
+        vertexai.init(project=project, location=location)
         connector = GitHubConnector(token=token)
         engine = AuditEngine(connector=connector)
         rag = RAGCorpusManager(corpus_name="quality-guardian-audits")
@@ -206,7 +209,11 @@ def check_new_commits(repo: str) -> dict:
         
         # Get last analyzed commit from Firestore (deterministic storage)
         from storage.firestore_client import FirestoreAuditDB
-        firestore_db = FirestoreAuditDB(project_id=project)
+        firestore_db = FirestoreAuditDB(
+            project_id=project,
+            database=os.getenv("FIRESTORE_DATABASE", "(default)"),
+            collection_prefix=os.getenv("FIRESTORE_COLLECTION_PREFIX", "quality-guardian")
+        )
         last_audits = firestore_db.query_by_repository(repo, limit=1, order_by="date", descending=True)
         last_sha = last_audits[0].commit_sha if last_audits else None
         
@@ -232,8 +239,8 @@ def check_new_commits(repo: str) -> dict:
         from storage.firestore_client import FirestoreAuditDB
         firestore_db = FirestoreAuditDB(
             project_id=project,
-            database="(default)",
-            collection_prefix="quality-guardian"
+            database=os.getenv("FIRESTORE_DATABASE", "(default)"),
+            collection_prefix=os.getenv("FIRESTORE_COLLECTION_PREFIX", "quality-guardian")
         )
         
         # Analyze new commits with dual write
@@ -309,13 +316,14 @@ def query_trends(repo: str, question: str) -> dict:
         
         # Initialize
         project = os.getenv("GOOGLE_CLOUD_PROJECT")
-        vertexai.init(project=project, location="us-west1")
+        location = os.getenv("VERTEX_LOCATION", "us-west1")
+        vertexai.init(project=project, location=location)
         
         # Get commits from Firestore (primary source)
         db = FirestoreAuditDB(
             project_id=project,
-            database="(default)",
-            collection_prefix="quality-guardian"
+            database=os.getenv("FIRESTORE_DATABASE", "(default)"),
+            collection_prefix=os.getenv("FIRESTORE_COLLECTION_PREFIX", "quality-guardian")
         )
         
         # Check if repo exists
@@ -441,13 +449,14 @@ def list_analyzed_repositories() -> dict:
         if not project:
             return {"error": "Missing GOOGLE_CLOUD_PROJECT"}
         
-        vertexai.init(project=project, location="us-west1")
+        location = os.getenv("VERTEX_LOCATION", "us-west1")
+        vertexai.init(project=project, location=location)
         
         # Read from Firestore (primary storage)
         firestore_db = FirestoreAuditDB(
             project_id=project,
-            database="(default)",
-            collection_prefix="quality-guardian"
+            database=os.getenv("FIRESTORE_DATABASE", "(default)"),
+            collection_prefix=os.getenv("FIRESTORE_COLLECTION_PREFIX", "quality-guardian")
         )
         
         repositories = firestore_db.get_repositories()

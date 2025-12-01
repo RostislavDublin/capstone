@@ -1,0 +1,25 @@
+{
+  "eval_set_id": "quality_guardian_simple",
+  "eval_cases": [
+    {
+      "eval_id": "01_bootstrap",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Bootstrap RostislavDublin/quality-guardian-test-fixture and analyze the last 10 commits"}]
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "02_query_trends",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Show quality trends for RostislavDublin/quality-guardian-test-fixture"}]
+          }
+        }
+      ]
+    }
+  ]
+}

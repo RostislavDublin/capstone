@@ -16,13 +16,14 @@ sys.path.insert(0, str(project_root / "tests"))
 
 from fixtures.fast_reset_api import reset_to_fixture_state_api
 from fixtures import apply_remaining_fixture_commits
+from fixtures.test_repo_fixture import get_test_repo_name
 from github import Github
 import os
 from dotenv import load_dotenv
 
 load_dotenv(project_root / ".env")
 
-TEST_REPO_FULL = "RostislavDublin/quality-guardian-test-fixture"
+TEST_REPO_FULL = get_test_repo_name()
 
 
 def main():

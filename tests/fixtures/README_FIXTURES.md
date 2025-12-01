@@ -92,7 +92,7 @@ Each commit fixture contains:
 
 ### `reset_to_fixture_state()`
 
-Resets `quality-guardian-test-fixture` repository to clean, deterministic state:
+Resets test repository (configured via `TEST_REPO_NAME` in `.env`) to clean, deterministic state:
 
 1. Clones repository
 2. Removes all existing files (except `.git`)

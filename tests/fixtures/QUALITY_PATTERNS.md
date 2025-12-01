@@ -6,7 +6,7 @@ This document describes the **intentional quality patterns** in our test fixture
 
 ## Repository Information
 
-- **GitHub Repository**: `RostislavDublin/quality-guardian-test-fixture`
+- **GitHub Repository**: Configured via `TEST_REPO_NAME` in `.env` (default: `quality-guardian-test-fixture`)
 - **Total Commits**: 16 (1 initial + 15 fixture commits)
 - **Timeline**: 35 days (initial commit at NOW-35 days, fixtures at NOW-30 days + [0...14])
 - **Purpose**: Realistic code evolution with measurable quality trends
@@ -154,7 +154,7 @@ Trends: STABLE but FLUCTUATING pattern detected
 
 ### Expected Agent Behaviors
 
-**Repository-Level Query**: "Show trends for RostislavDublin/quality-guardian-test-fixture"
+**Repository-Level Query**: "Show trends for <owner>/<repo>" (use your configured test repository)
 - Should identify FLUCTUATING pattern
 - Should note peak and decline
 - Should calculate average ~85.6

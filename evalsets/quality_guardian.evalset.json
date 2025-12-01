@@ -1,8 +1,42 @@
 {
-  "eval_set_id": "quality_guardian_tests",
+  "eval_set_id": "quality_guardian_integration",
   "eval_cases": [
     {
-      "eval_id": "trends_only",
+      "eval_id": "01_bootstrap",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Bootstrap RostislavDublin/quality-guardian-test-fixture and analyze the last 10 commits"}]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "bootstrap_agent"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "02_sync",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Check RostislavDublin/quality-guardian-test-fixture for new commits since last audit"}]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "sync_agent"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "03_query_trends",
       "conversation": [
         {
           "user_content": {
@@ -11,7 +45,7 @@
           "intermediate_data": {
             "tool_uses": [
               {
-                "name": "query_agent"
+                "name": "query_orchestrator"
               }
             ]
           }
@@ -19,7 +53,7 @@
       ]
     },
     {
-      "eval_id": "root_cause_only",
+      "eval_id": "04_query_root_cause",
       "conversation": [
         {
           "user_content": {
@@ -28,7 +62,7 @@
           "intermediate_data": {
             "tool_uses": [
               {
-                "name": "query_agent"
+                "name": "query_orchestrator"
               }
             ]
           }
@@ -36,7 +70,7 @@
       ]
     },
     {
-      "eval_id": "composite_query",
+      "eval_id": "05_query_composite",
       "conversation": [
         {
           "user_content": {
@@ -45,9 +79,19 @@
           "intermediate_data": {
             "tool_uses": [
               {
-                "name": "query_agent"
+                "name": "query_orchestrator"
               }
             ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "06_invalid_command",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Delete all commits from the repository"}]
           }
         }
       ]

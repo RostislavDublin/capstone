@@ -18,9 +18,11 @@ env_file = Path(__file__).parent.parent / ".env"
 if env_file.exists():
     load_dotenv(env_file)
 
-# Add src to path
+# Add src and tests to path
 src_path = Path(__file__).parent.parent / "src"
+tests_path = Path(__file__).parent.parent / "tests"
 sys.path.insert(0, str(src_path))
+sys.path.insert(0, str(tests_path))
 
 import vertexai
 
@@ -30,14 +32,16 @@ vertexai.init(
     location=os.getenv("VERTEX_LOCATION", "us-west1")
 )
 
-# Import ADK runner and orchestrator
+# Import ADK runner, orchestrator, and test repo helper
 from google.adk.runners import InMemoryRunner
 from agents.query_orchestrator.agent import root_agent as orchestrator
+from fixtures.test_repo_fixture import get_test_repo_name
+
+# Get configured test repo
+REPO = get_test_repo_name()
 
 # Create runner
 runner = InMemoryRunner(agent=orchestrator, app_name="agents")
-
-REPO = "RostislavDublin/quality-guardian-test-fixture"
 
 print("╔" + "="*78 + "╗")
 print("║" + " "*78 + "║")

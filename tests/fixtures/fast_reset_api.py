@@ -17,7 +17,10 @@ if not load_dotenv():
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
-TEST_REPO_FULL = "RostislavDublin/quality-guardian-test-fixture"
+# Get test repo from environment
+TEST_REPO_NAME = os.getenv("TEST_REPO_NAME", "quality-guardian-test-fixture")
+TEST_REPO_OWNER = os.getenv("TEST_REPO_OWNER", "RostislavDublin")
+TEST_REPO_FULL = f"{TEST_REPO_OWNER}/{TEST_REPO_NAME}"
 FIXTURE_PATH = Path(__file__).parent / "test-app"
 
 

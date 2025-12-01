@@ -14,9 +14,11 @@ env_file = Path(__file__).parent.parent / ".env"
 if env_file.exists():
     load_dotenv(env_file)
 
-# Add src to path
+# Add src and tests to path
 src_path = Path(__file__).parent.parent / "src"
+tests_path = Path(__file__).parent.parent / "tests"
 sys.path.insert(0, str(src_path))
+sys.path.insert(0, str(tests_path))
 
 import vertexai
 from google.adk.runners import InMemoryRunner
@@ -27,8 +29,12 @@ vertexai.init(
     location=os.getenv("VERTEX_LOCATION", "us-west1")
 )
 
-# Import agent
+# Import agent and test repo helper
 from agents.query_root_cause.agent import root_agent
+from fixtures.test_repo_fixture import get_test_repo_name
+
+# Get configured test repo
+REPO = get_test_repo_name()
 
 # Create runner
 runner = InMemoryRunner(agent=root_agent, app_name="agents")
@@ -39,7 +45,7 @@ print("║" + " "*20 + "ROOT CAUSE ANALYSIS - RAG Demo" + " "*27 + "║")
 print("║" + " "*78 + "║")
 print("╚" + "="*78 + "╝")
 print()
-print("Repository: RostislavDublin/quality-guardian-test-fixture")
+print(f"Repository: {REPO}")
 print("Feature: RAG semantic search finds WHY quality degraded")
 print()
 
@@ -49,13 +55,13 @@ print("  Scenario 1: Why did quality drop in last 2 weeks?")
 print("="*80)
 print()
 print("Description: Use RAG semantic search to find problematic commits")
-print("Query: Why did quality drop in RostislavDublin/quality-guardian-test-fixture")
+print(f"Query: Why did quality drop in {REPO}")
 print("       in the last 2 weeks?")
 print()
 print()
 
-query1 = """
-Why did code quality drop in RostislavDublin/quality-guardian-test-fixture 
+query1 = f"""
+Why did code quality drop in {REPO} 
 in the last 2 weeks? Find the root causes.
 """
 

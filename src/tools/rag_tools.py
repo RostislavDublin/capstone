@@ -50,7 +50,8 @@ def rag_root_cause_analysis(
     try:
         # Initialize
         project = os.getenv("GOOGLE_CLOUD_PROJECT")
-        vertexai.init(project=project, location="us-west1")
+        location = os.getenv("VERTEX_LOCATION", "us-west1")
+        vertexai.init(project=project, location=location)
         
         # Get corpus
         rag_mgr = RAGCorpusManager(corpus_name="quality-guardian-audits")
