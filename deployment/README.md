@@ -20,6 +20,8 @@ Deploy Quality Guardian agent to Vertex AI Agent Engine for production use.
      - `Cloud Run Admin`
      - `Service Account User`
      - `Storage Admin`
+     - `Cloud Datastore User` (for Firestore access)
+     - `Logs Viewer` (optional, for debugging with check_logs.py)
    - Download JSON key as `deployment/service-account-key.json`
 
 4. **ADK CLI:**
